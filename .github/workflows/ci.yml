@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build python3-pip
+        pip install meson
+
+    - name: Setup build
+      run: meson setup build
+
+    - name: Build
+      run: ninja -C build
+
+    - name: Run tests
+      run: meson test -C build
