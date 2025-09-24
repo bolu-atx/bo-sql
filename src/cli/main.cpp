@@ -9,16 +9,16 @@
 #include "types.h"
 
 template<typename... Args>
-void print_info(std::string_view fmt, Args&&... args) { fmt::print("{}\n", fmt::vformat(fmt, fmt::make_format_args(std::forward<Args>(args)...))); }
+void print_info(std::string_view fmt, Args const&... args) { fmt::print("{}\n", fmt::vformat(fmt, fmt::make_format_args(args...))); }
 
 template<typename... Args>
-void print_success(std::string_view fmt, Args&&... args) { fmt::print(fg(fmt::color::green), "{}\n", fmt::vformat(fmt, fmt::make_format_args(std::forward<Args>(args)...))); }
+void print_success(std::string_view fmt, Args const&... args) { fmt::print(fg(fmt::color::green), "{}\n", fmt::vformat(fmt, fmt::make_format_args(args...))); }
 
 template<typename... Args>
-void print_warning(std::string_view fmt, Args&&... args) { fmt::print(fg(fmt::color::yellow), "{}\n", fmt::vformat(fmt, fmt::make_format_args(std::forward<Args>(args)...))); }
+void print_warning(std::string_view fmt, Args const&... args) { fmt::print(fg(fmt::color::yellow), "{}\n", fmt::vformat(fmt, fmt::make_format_args(args...))); }
 
 template<typename... Args>
-void print_error(std::string_view fmt, Args&&... args) { fmt::print(fg(fmt::color::red), "{}\n", fmt::vformat(fmt, fmt::make_format_args(std::forward<Args>(args)...))); }
+void print_error(std::string_view fmt, Args const&... args) { fmt::print(fg(fmt::color::red), "{}\n", fmt::vformat(fmt, fmt::make_format_args(args...))); }
 
 std::string type_name(TypeId type) {
     switch (type) {
