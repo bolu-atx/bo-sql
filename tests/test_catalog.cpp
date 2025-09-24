@@ -19,12 +19,20 @@ TEST_CASE("Catalog roundtrip test", "[catalog]") {
     table.name = "mytable";
     meta.name = "mytable";
 
+    // Debug: check meta name before registering
+    REQUIRE(meta.name == "mytable");
+
     Catalog catalog;
-    catalog.register_table(std::move(meta));
+    catalog.register_table(std::move(table), std::move(meta));
+
+    // Debug: check list of tables
+    auto table_list = catalog.list_tables();
+    REQUIRE(table_list.size() == 1);
+    REQUIRE(table_list[0] == "mytable");
 
     // Retrieve from catalog
-    const TableMeta* retrieved = catalog.get_table("mytable");
-    REQUIRE(retrieved != nullptr);
+    OptionalRef<const TableMeta> retrieved = catalog.get_table_meta("mytable");
+    REQUIRE(retrieved.has_value());
     REQUIRE(retrieved->name == "mytable");
     REQUIRE(retrieved->row_count == 2);
     REQUIRE(retrieved->columns.size() == 2);

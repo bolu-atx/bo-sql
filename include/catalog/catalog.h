@@ -6,7 +6,9 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <utility>
 #include "types.h"
+#include "storage/table.h"
 
 // Column statistics
 struct ColumnStats {
@@ -38,17 +40,20 @@ struct TableMeta {
         : name(std::move(n)), columns(std::move(cols)), row_count(rows) {}
 };
 
-// Catalog for managing table metadata
+// Catalog for managing tables and metadata
 class Catalog {
 private:
-    std::unordered_map<std::string, TableMeta> tables_;
+    std::unordered_map<std::string, std::pair<Table, TableMeta>> tables_;
 
 public:
     // Register a table in the catalog
-    void register_table(TableMeta table_meta);
+    void register_table(Table table, TableMeta&& table_meta);
+
+    // Get table data by name
+    OptionalRef<const Table> get_table_data(const std::string& name) const;
 
     // Get table metadata by name
-    const TableMeta* get_table(const std::string& name) const;
+    OptionalRef<const TableMeta> get_table_meta(const std::string& name) const;
 
     // List all table names
     std::vector<std::string> list_tables() const;
