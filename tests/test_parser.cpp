@@ -140,3 +140,19 @@ TEST_CASE("AST test - GROUP BY, ORDER BY, LIMIT", "[parser]") {
     REQUIRE(stmt.order_by[0].asc == false);
     REQUIRE(stmt.limit == 10);
 }
+
+TEST_CASE("AST to_string test", "[parser]") {
+    SelectStmt stmt = parse_sql("SELECT a, b FROM t;");
+    std::string result = stmt.to_string();
+    // Just check that it contains the expected parts
+    REQUIRE(result.find("SELECT") != std::string::npos);
+    REQUIRE(result.find("a, b") != std::string::npos);
+    REQUIRE(result.find("FROM t") != std::string::npos);
+
+    SelectStmt stmt2 = parse_sql("SELECT x FROM orders o JOIN lineitem l ON o.id = l.id WHERE qty > 10;");
+    std::string result2 = stmt2.to_string();
+    REQUIRE(result2.find("SELECT x") != std::string::npos);
+    REQUIRE(result2.find("FROM orders o") != std::string::npos);
+    REQUIRE(result2.find("JOIN lineitem l") != std::string::npos);
+    REQUIRE(result2.find("WHERE") != std::string::npos);
+}

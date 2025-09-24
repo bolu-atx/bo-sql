@@ -12,12 +12,14 @@ core_sources = files(
     'src/storage/table.cpp',
     'src/storage/csv_loader.cpp',
     'src/catalog/catalog.cpp',
-    'src/parser/parser.cpp'
+    'src/parser/parser.cpp',
+    'src/parser/ast_to_string.cpp'
 )
 
 libcore = static_library('core',
     sources: core_sources,
-    include_directories: inc
+    include_directories: inc,
+    dependencies: [dependency('fmt', fallback: ['fmt', 'fmt_dep'])]
 )
 
 # CLI module meson.build
@@ -26,7 +28,7 @@ cli_exe = executable('bo-sql',
     sources: cli_sources,
     include_directories: inc,
     link_with: libcore,
-    dependencies: [dependency('fmt')]
+    dependencies: [dependency('fmt', fallback: ['fmt', 'fmt_dep'])]
 )
 
 # tests dir has its own meson.build
