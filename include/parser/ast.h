@@ -35,12 +35,17 @@ struct Expr {
     // For function calls
     std::string func_name;
     std::vector<std::unique_ptr<Expr> > args;
+
+    std::string to_string() const;
+    std::unique_ptr<Expr> clone() const;
 };
 
 // Item in SELECT list with optional alias
 struct SelectItem {
     std::string alias;
     std::unique_ptr<Expr> expr;
+
+    std::string to_string() const;
 };
 
 // Aggregate functions
@@ -52,27 +57,43 @@ enum class AggFunc {
 struct GroupByClause {
     std::vector<std::unique_ptr<Expr> > columns;
     std::unique_ptr<Expr> having;
+
+    std::string to_string() const;
 };
 
 // Item in ORDER BY clause
 struct OrderByItem {
     std::unique_ptr<Expr> expr;
     bool asc = true;
+
+    std::string to_string() const;
+};
+
+// Table reference with optional alias
+struct TableRef {
+    std::string table_name;
+    std::string alias; // empty if no alias
+
+    std::string to_string() const;
 };
 
 // JOIN clause item
 struct JoinItem {
-    std::string table_name;
+    TableRef table_ref;
     std::unique_ptr<Expr> on_condition;
+
+    std::string to_string() const;
 };
 
 // SELECT statement AST node
 struct SelectStmt {
     std::vector<SelectItem> select_list;
-    std::string from_table;
+    TableRef from_table;
     std::unique_ptr<Expr> where_clause;
     std::vector<JoinItem> joins;
     GroupByClause group_by;
     std::vector<OrderByItem> order_by;
     int limit = -1;
+
+    std::string to_string() const;
 };

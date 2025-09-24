@@ -7,6 +7,6 @@ size_t Table::get_column_index(const std::string& col_name) const {
     throw std::runtime_error("Column not found: " + col_name);
 }
 
-const std::unique_ptr<Column>& Table::get_column_data(const std::string& col_name) const {
-    return columns[get_column_index(col_name)].data;
+const Column& Table::get_column_data(const std::string& col_name) const {
+    return *columns[get_column_index(col_name)].data;
 }

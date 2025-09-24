@@ -26,5 +26,5 @@ struct Table {
     size_t get_column_index(const std::string& col_name) const;
 
     // Get column data
-    const std::unique_ptr<Column>& get_column_data(const std::string& col_name) const;
+    const Column& get_column_data(const std::string& col_name) const;
 };

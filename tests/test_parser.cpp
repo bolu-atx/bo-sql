@@ -73,11 +73,13 @@ TEST_CASE("Parser JOIN test", "[parser]") {
     SelectStmt stmt = parse_sql("SELECT name FROM products INNER JOIN orders ON id = pid");
 
     // Check FROM table
-    REQUIRE(stmt.from_table == "products");
+    REQUIRE(stmt.from_table.table_name == "products");
+    REQUIRE(stmt.from_table.alias.empty());
 
     // Check JOIN
     REQUIRE(stmt.joins.size() == 1);
-    REQUIRE(stmt.joins[0].table_name == "orders");
+    REQUIRE(stmt.joins[0].table_ref.table_name == "orders");
+    REQUIRE(stmt.joins[0].table_ref.alias.empty());
     REQUIRE(stmt.joins[0].on_condition->type == ExprType::BINARY_OP);
     REQUIRE(stmt.joins[0].on_condition->op == BinaryOp::EQ);
 }
@@ -85,10 +87,72 @@ TEST_CASE("Parser JOIN test", "[parser]") {
 TEST_CASE("Parser error handling test", "[parser]") {
     // Test missing FROM
     REQUIRE_THROWS_AS(parse_sql("SELECT name"), std::runtime_error);
-    
+
     // Test invalid token
     REQUIRE_THROWS_AS(parse_sql("SELECT @name FROM table"), std::runtime_error);
-    
+
     // Test incomplete expression
     REQUIRE_THROWS_AS(parse_sql("SELECT name FROM table WHERE"), std::runtime_error);
+}
+
+TEST_CASE("AST test - SELECT a, b FROM t;", "[parser]") {
+    SelectStmt stmt = parse_sql("SELECT a, b FROM t;");
+    REQUIRE(stmt.select_list.size() == 2);
+    REQUIRE(stmt.select_list[0].expr->type == ExprType::COLUMN_REF);
+    REQUIRE(stmt.select_list[0].expr->str_val == "a");
+    REQUIRE(stmt.select_list[1].expr->type == ExprType::COLUMN_REF);
+    REQUIRE(stmt.select_list[1].expr->str_val == "b");
+    REQUIRE(stmt.from_table.table_name == "t");
+    REQUIRE(stmt.from_table.alias.empty());
+}
+
+TEST_CASE("AST test - JOIN with WHERE", "[parser]") {
+    SelectStmt stmt = parse_sql("SELECT x FROM orders o JOIN lineitem l ON o.id = l.id WHERE qty > 10;");
+    REQUIRE(stmt.select_list.size() == 1);
+    REQUIRE(stmt.select_list[0].expr->type == ExprType::COLUMN_REF);
+    REQUIRE(stmt.select_list[0].expr->str_val == "x");
+    REQUIRE(stmt.from_table.table_name == "orders");
+    REQUIRE(stmt.from_table.alias == "o");
+    REQUIRE(stmt.joins.size() == 1);
+    REQUIRE(stmt.joins[0].table_ref.table_name == "lineitem");
+    REQUIRE(stmt.joins[0].table_ref.alias == "l");
+    REQUIRE(stmt.joins[0].on_condition->type == ExprType::BINARY_OP);
+    REQUIRE(stmt.joins[0].on_condition->op == BinaryOp::EQ);
+    REQUIRE(stmt.where_clause->type == ExprType::BINARY_OP);
+    REQUIRE(stmt.where_clause->op == BinaryOp::GT);
+}
+
+TEST_CASE("AST test - GROUP BY, ORDER BY, LIMIT", "[parser]") {
+    SelectStmt stmt = parse_sql("SELECT sku, SUM(qty) FROM lineitem GROUP BY sku ORDER BY SUM(qty) DESC LIMIT 10;");
+    REQUIRE(stmt.select_list.size() == 2);
+    REQUIRE(stmt.select_list[0].expr->type == ExprType::COLUMN_REF);
+    REQUIRE(stmt.select_list[0].expr->str_val == "sku");
+    REQUIRE(stmt.select_list[1].expr->type == ExprType::FUNC_CALL);
+    REQUIRE(stmt.select_list[1].expr->func_name == "SUM");
+    REQUIRE(stmt.from_table.table_name == "lineitem");
+    REQUIRE(stmt.from_table.alias.empty());
+    REQUIRE(stmt.group_by.columns.size() == 1);
+    REQUIRE(stmt.group_by.columns[0]->type == ExprType::COLUMN_REF);
+    REQUIRE(stmt.group_by.columns[0]->str_val == "sku");
+    REQUIRE(stmt.order_by.size() == 1);
+    REQUIRE(stmt.order_by[0].expr->type == ExprType::FUNC_CALL);
+    REQUIRE(stmt.order_by[0].expr->func_name == "SUM");
+    REQUIRE(stmt.order_by[0].asc == false);
+    REQUIRE(stmt.limit == 10);
+}
+
+TEST_CASE("AST to_string test", "[parser]") {
+    SelectStmt stmt = parse_sql("SELECT a, b FROM t;");
+    std::string result = stmt.to_string();
+    // Just check that it contains the expected parts
+    REQUIRE(result.find("SELECT") != std::string::npos);
+    REQUIRE(result.find("a, b") != std::string::npos);
+    REQUIRE(result.find("FROM t") != std::string::npos);
+
+    SelectStmt stmt2 = parse_sql("SELECT x FROM orders o JOIN lineitem l ON o.id = l.id WHERE qty > 10;");
+    std::string result2 = stmt2.to_string();
+    REQUIRE(result2.find("SELECT x") != std::string::npos);
+    REQUIRE(result2.find("FROM orders o") != std::string::npos);
+    REQUIRE(result2.find("JOIN lineitem l") != std::string::npos);
+    REQUIRE(result2.find("WHERE") != std::string::npos);
 }

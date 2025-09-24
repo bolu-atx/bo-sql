@@ -98,3 +98,12 @@ GROUP BY l.sku
 ORDER BY rev DESC
 LIMIT 20;
 ```
+
+
+## Design Choices
+
+- Columnar + vectorized: shows memory bandwidth, CPU cache, SIMDable loops, simple predicate pushdown.
+- Dictionary encoding for strings: design ID vs payload columns and equality predicate acceleration.
+- Rule-based optimizer: implement real rewrites and simple stats; enough to compare plans.
+- Hash join + hash agg only: one great path > many mediocre ones.
+- In-memory only: ignore buffer manager & logging; still real for analytics
