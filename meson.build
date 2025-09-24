@@ -11,7 +11,8 @@ core_sources = files(
     'src/storage/dictionary.cpp',
     'src/storage/table.cpp',
     'src/storage/csv_loader.cpp',
-    'src/catalog/catalog.cpp'
+    'src/catalog/catalog.cpp',
+    'src/parser/parser.cpp'
 )
 
 libcore = static_library('core',
