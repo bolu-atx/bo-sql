@@ -87,16 +87,16 @@ template<typename T>
 TypeId type_id_for();
 
 template<>
-TypeId type_id_for<int64_t>() { return TypeId::INT64; }
+inline TypeId type_id_for<int64_t>() { return TypeId::INT64; }
 
 template<>
-TypeId type_id_for<double>() { return TypeId::DOUBLE; }
+inline TypeId type_id_for<double>() { return TypeId::DOUBLE; }
 
 template<>
-TypeId type_id_for<int32_t>() { return TypeId::DATE32; }
+inline TypeId type_id_for<int32_t>() { return TypeId::DATE32; }
 
 template<>
-TypeId type_id_for<uint32_t>() { return TypeId::STRING; }
+inline TypeId type_id_for<uint32_t>() { return TypeId::STRING; }
 
 // Base class
 struct Column {

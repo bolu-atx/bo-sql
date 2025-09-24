@@ -45,23 +45,11 @@ private:
 
 public:
     // Register a table in the catalog
-    void register_table(TableMeta table_meta) {
-        tables_[table_meta.name] = std::move(table_meta);
-    }
+    void register_table(TableMeta table_meta);
 
     // Get table metadata by name
-    const TableMeta* get_table(const std::string& name) const {
-        auto it = tables_.find(name);
-        return it != tables_.end() ? &it->second : nullptr;
-    }
+    const TableMeta* get_table(const std::string& name) const;
 
     // List all table names
-    std::vector<std::string> list_tables() const {
-        std::vector<std::string> names;
-        names.reserve(tables_.size());
-        for (std::unordered_map<std::string, TableMeta>::const_iterator it = tables_.begin(); it != tables_.end(); ++it) {
-            names.push_back(it->first);
-        }
-        return names;
-    }
+    std::vector<std::string> list_tables() const;
 };

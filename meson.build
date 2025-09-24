@@ -8,9 +8,11 @@ inc = include_directories('include')
 
 # Core library
 core_sources = files(
-    'storage/dictionary.cpp',
-    'storage/table.cpp',
-    'catalog/catalog.cpp'
+    'src/storage/dictionary.cpp',
+    'src/storage/table.cpp',
+    'src/storage/csv_loader.cpp',
+    'src/catalog/catalog.cpp',
+    'src/parser/parser.cpp'
 )
 
 libcore = static_library('core',
@@ -18,5 +20,14 @@ libcore = static_library('core',
     include_directories: inc
 )
 
+# CLI module meson.build
+cli_sources = files('src/cli/main.cpp')
+cli_exe = executable('bo-sql',
+    sources: cli_sources,
+    include_directories: inc,
+    link_with: libcore,
+    dependencies: [dependency('fmt')]
+)
 
+# tests dir has its own meson.build
 subdir('tests')
