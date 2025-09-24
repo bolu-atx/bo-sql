@@ -6,7 +6,8 @@ tests_sources = files(
     'test_types.cpp',
     'test_columnar.cpp',
     'test_csv.cpp',
-    'test_catalog.cpp'
+    'test_catalog.cpp',
+    'test_logical.cpp'
 )
 tests_exe = executable('tests',
     sources: tests_sources,

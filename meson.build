@@ -13,7 +13,9 @@ core_sources = files(
     'src/storage/csv_loader.cpp',
     'src/catalog/catalog.cpp',
     'src/parser/parser.cpp',
-    'src/parser/ast_to_string.cpp'
+    'src/parser/ast_to_string.cpp',
+    'src/logical/logical.cpp',
+    'src/logical/planner.cpp'
 )
 
 libcore = static_library('core',

@@ -6,6 +6,8 @@
 #include <fmt/color.h>
 #include "catalog/catalog.h"
 #include "storage/csv_loader.h"
+#include "parser/parser.h"
+#include "logical/planner.h"
 #include "types.h"
 
 template<typename... Args>
@@ -98,10 +100,30 @@ int main() {
                      fmt::print(")\n");
                  }
             }
+        } else if (command == "EXPLAIN") {
+            std::string sql;
+            std::getline(iss, sql);
+            // Remove leading spaces
+            size_t start = sql.find_first_not_of(" \t");
+            if (start != std::string::npos) {
+                sql = sql.substr(start);
+            }
+            if (sql.empty()) {
+                print_warning("Syntax: EXPLAIN <sql>");
+            } else {
+                try {
+                    SelectStmt stmt = parse_sql(sql);
+                    LogicalPlanner planner;
+                    auto plan = planner.build_logical_plan(stmt);
+                    fmt::print("{}\n", plan->to_string());
+                } catch (const std::exception& e) {
+                    print_error("Error: {}", e.what());
+                }
+            }
         } else if (command == "EXIT" || command == "QUIT") {
             break;
         } else {
-            print_warning("Unknown command. Available: LOAD TABLE, SHOW TABLES, DESCRIBE <table>, EXIT");
+            print_warning("Unknown command. Available: LOAD TABLE, SHOW TABLES, DESCRIBE <table>, EXPLAIN <sql>, EXIT");
         }
 
         fmt::print("> ");

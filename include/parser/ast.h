@@ -37,6 +37,7 @@ struct Expr {
     std::vector<std::unique_ptr<Expr> > args;
 
     std::string to_string() const;
+    std::unique_ptr<Expr> clone() const;
 };
 
 // Item in SELECT list with optional alias

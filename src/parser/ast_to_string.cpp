@@ -1,4 +1,5 @@
 #include "parser/ast.h"
+#include "parser/ast.h"
 #include <fmt/core.h>
 #include <sstream>
 
@@ -116,4 +117,20 @@ std::string SelectStmt::to_string() const {
     }
 
     return ss.str();
+}
+
+std::unique_ptr<Expr> Expr::clone() const {
+    auto cloned = std::make_unique<Expr>();
+    cloned->type = type;
+    cloned->str_val = str_val;
+    cloned->i64_val = i64_val;
+    cloned->f64_val = f64_val;
+    cloned->op = op;
+    if (left) cloned->left = left->clone();
+    if (right) cloned->right = right->clone();
+    cloned->func_name = func_name;
+    for (const auto& arg : args) {
+        cloned->args.push_back(arg->clone());
+    }
+    return cloned;
 }
