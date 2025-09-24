@@ -12,13 +12,15 @@ enum class ExprType {
     LITERAL_INT,
     LITERAL_DOUBLE,
     LITERAL_STRING,
-    BINARY_OP
+    BINARY_OP,
+    FUNC_CALL
 };
 
 // Binary operators
 enum class BinaryOp {
     EQ, NE, LT, LE, GT, GE,
-    ADD, SUB, MUL, DIV
+    ADD, SUB, MUL, DIV,
+    AND, OR
 };
 
 // Base expression node
@@ -30,6 +32,9 @@ struct Expr {
     f64 f64_val;
     BinaryOp op; // for binary
     std::unique_ptr<Expr> left, right; // for binary
+    // For function calls
+    std::string func_name;
+    std::vector<std::unique_ptr<Expr> > args;
 };
 
 // Item in SELECT list with optional alias
@@ -46,6 +51,7 @@ enum class AggFunc {
 // GROUP BY clause
 struct GroupByClause {
     std::vector<std::unique_ptr<Expr> > columns;
+    std::unique_ptr<Expr> having;
 };
 
 // Item in ORDER BY clause
@@ -54,12 +60,18 @@ struct OrderByItem {
     bool asc = true;
 };
 
+// JOIN clause item
+struct JoinItem {
+    std::string table_name;
+    std::unique_ptr<Expr> on_condition;
+};
+
 // SELECT statement AST node
 struct SelectStmt {
     std::vector<SelectItem> select_list;
     std::string from_table;
     std::unique_ptr<Expr> where_clause;
-    std::vector<std::pair<std::string, std::string> > joins; // table, on_condition as string for simplicity
+    std::vector<JoinItem> joins;
     GroupByClause group_by;
     std::vector<OrderByItem> order_by;
     int limit = -1;

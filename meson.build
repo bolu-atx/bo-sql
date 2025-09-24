@@ -8,9 +8,10 @@ inc = include_directories('include')
 
 # Core library
 core_sources = files(
-    'storage/dictionary.cpp',
-    'storage/table.cpp',
-    'catalog/catalog.cpp'
+    'src/storage/dictionary.cpp',
+    'src/storage/table.cpp',
+    'src/storage/csv_loader.cpp',
+    'src/catalog/catalog.cpp'
 )
 
 libcore = static_library('core',
@@ -18,5 +19,6 @@ libcore = static_library('core',
     include_directories: inc
 )
 
-
+subdir('src/parser')
+subdir('src/cli')
 subdir('tests')
