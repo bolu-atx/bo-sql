@@ -91,9 +91,12 @@ TypeId type_id_for<double>() { return TypeId::DOUBLE; }
 template<>
 TypeId type_id_for<int32_t>() { return TypeId::DATE32; }
 
+template<>
+TypeId type_id_for<uint32_t>() { return TypeId::STRING; }
+
 // Base class
 struct Column {
-    virtual ~Column() = default;
+    virtual ~Column() {}
     virtual TypeId type() const = 0;
     virtual size_t size() const = 0;
 };
@@ -104,6 +107,7 @@ struct ColumnVector : public Column {
     std::vector<T> data;
 
     explicit ColumnVector(size_t reserve = 0) { data.reserve(reserve); }
+    explicit ColumnVector(std::vector<T> d) : data(std::move(d)) {}
 
     TypeId type() const override { return type_id_for<T>(); }
     size_t size() const override { return data.size(); }
@@ -114,7 +118,7 @@ struct ColumnVector : public Column {
 // RecordBatch abstraction
 struct RecordBatch {
     std::vector<ColumnType> schema;
-    std::vector<std::unique_ptr<Column>> columns;
+    std::vector<std::unique_ptr<Column> > columns;
 
     RecordBatch(std::vector<ColumnType> s) : schema(std::move(s)) {
         columns.reserve(schema.size());
@@ -130,7 +134,7 @@ struct RecordBatch {
 
     // Add a column to the batch
     template<typename T>
-    void add_column(std::unique_ptr<ColumnVector<T>> col) {
+    void add_column(std::unique_ptr<ColumnVector<T> > col) {
         columns.push_back(std::move(col));
     }
 

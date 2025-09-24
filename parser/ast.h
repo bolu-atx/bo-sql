@@ -21,7 +21,10 @@ enum class BinaryOp {
 
 struct Expr {
     ExprType type;
-    std::variant<std::string, i64, f64, std::string> value; // for literals
+    // For literals: use separate fields since no variant
+    std::string str_val;
+    i64 i64_val;
+    f64 f64_val;
     BinaryOp op; // for binary
     std::unique_ptr<Expr> left, right; // for binary
 };
