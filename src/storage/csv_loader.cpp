@@ -1,5 +1,7 @@
 #include "storage/csv_loader.h"
 
+#include <cmath>
+
 std::pair<Table, TableMeta> load_csv(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
