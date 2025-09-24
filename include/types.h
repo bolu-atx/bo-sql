@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <stdexcept>
 #include <vector>
 
 using i64 = int64_t;
