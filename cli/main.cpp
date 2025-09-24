@@ -4,9 +4,9 @@
 #include <utility>
 #include <fmt/core.h>
 #include <fmt/color.h>
-#include "../catalog/catalog.h"
-#include "../storage/csv_loader.h"
-#include "../include/types.h"
+#include "catalog/catalog.h"
+#include "storage/csv_loader.h"
+#include "types.h"
 
 template<typename... Args>
 void print_info(std::string_view fmt, Args&&... args) { fmt::print("{}\n", fmt::vformat(fmt, fmt::make_format_args(std::forward<Args>(args)...))); }

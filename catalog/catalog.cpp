@@ -1,3 +1,3 @@
-#include "catalog.h"
+#include "catalog/catalog.h"
 
 // Catalog implementation - currently header-only, but can be extended

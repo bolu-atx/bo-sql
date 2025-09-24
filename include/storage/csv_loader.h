@@ -9,9 +9,9 @@
 #include <limits>
 #include <utility>
 #include <set>
-#include "../include/types.h"
-#include "table.h"
-#include "../catalog/catalog.h"
+#include "types.h"
+#include "storage/table.h"
+#include "catalog/catalog.h"
 
 std::pair<Table, TableMeta> load_csv(const std::string& filename) {
     std::ifstream file(filename);

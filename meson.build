@@ -6,6 +6,18 @@ project('bo-sql', 'cpp',
 # Include directories
 inc = include_directories('include')
 
+# Core library
+core_sources = files(
+    'storage/dictionary.cpp',
+    'storage/table.cpp',
+    'catalog/catalog.cpp'
+)
+
+libcore = static_library('core',
+    sources: core_sources,
+    include_directories: inc
+)
+
 # Subdirectories
 subdir('engine')
 subdir('parser')

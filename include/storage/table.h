@@ -5,16 +5,18 @@
 #include <variant>
 #include <memory>
 #include <stdexcept>
-#include "../include/types.h"
-#include "dictionary.h"
+#include "types.h"
+#include "storage/dictionary.h"
 
 // Removed variant, using unique_ptr<Column> instead
 
+// Represents a column in a table with name and data
 struct TableColumn {
     std::string name;
     std::unique_ptr<Column> data;
 };
 
+// Represents a table with columns and a shared dictionary for strings
 struct Table {
     std::string name;
     std::vector<TableColumn> columns;

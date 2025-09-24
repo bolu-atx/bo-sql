@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
-#include "../include/types.h"
+#include "types.h"
 
 // Column statistics
 struct ColumnStats {

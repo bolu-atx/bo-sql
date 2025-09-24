@@ -5,6 +5,6 @@ cli_sources = files('main.cpp')
 cli_exe = executable('bo-sql',
     sources: cli_sources,
     include_directories: inc,
-    link_with: [catalog_lib, storage_lib],
+    link_with: libcore,
     dependencies: [dependency('fmt')]
 )

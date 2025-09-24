@@ -4,8 +4,9 @@
 #include <vector>
 #include <variant>
 #include <memory>
-#include "../include/types.h"
+#include "types.h"
 
+// Types of expressions in the AST
 enum class ExprType {
     COLUMN_REF,
     LITERAL_INT,
@@ -14,11 +15,13 @@ enum class ExprType {
     BINARY_OP
 };
 
+// Binary operators
 enum class BinaryOp {
     EQ, NE, LT, LE, GT, GE,
     ADD, SUB, MUL, DIV
 };
 
+// Base expression node
 struct Expr {
     ExprType type;
     // For literals: use separate fields since no variant
@@ -29,24 +32,29 @@ struct Expr {
     std::unique_ptr<Expr> left, right; // for binary
 };
 
+// Item in SELECT list with optional alias
 struct SelectItem {
     std::string alias;
     std::unique_ptr<Expr> expr;
 };
 
+// Aggregate functions
 enum class AggFunc {
     NONE, SUM, COUNT, AVG
 };
 
+// GROUP BY clause
 struct GroupByClause {
     std::vector<std::unique_ptr<Expr> > columns;
 };
 
+// Item in ORDER BY clause
 struct OrderByItem {
     std::unique_ptr<Expr> expr;
     bool asc = true;
 };
 
+// SELECT statement AST node
 struct SelectStmt {
     std::vector<SelectItem> select_list;
     std::string from_table;

@@ -8,6 +8,7 @@ using f64 = double;
 using StrId = uint32_t;  // Dictionary-encoded string ID
 using Date32 = int32_t;  // YYYYMMDD format
 
+// Enumeration of supported data types
 enum class TypeId { INT64, DOUBLE, STRING, DATE32 };
 
 // Datum union for type-safe value storage
@@ -18,6 +19,7 @@ union DatumValue {
     Date32 date32_val;
 };
 
+// Type-safe wrapper for a single value with its type
 struct Datum {
     TypeId type;
     DatumValue value;

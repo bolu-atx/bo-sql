@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
-#include "../storage/csv_loader.h"
-#include "../catalog/catalog.h"
+#include "storage/csv_loader.h"
+#include "catalog/catalog.h"
 #include <fstream>
 #include "types.h"
 
