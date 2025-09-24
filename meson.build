@@ -20,6 +20,14 @@ libcore = static_library('core',
     include_directories: inc
 )
 
-subdir('src/parser')
-subdir('src/cli')
+# CLI module meson.build
+cli_sources = files('src/cli/main.cpp')
+cli_exe = executable('bo-sql',
+    sources: cli_sources,
+    include_directories: inc,
+    link_with: libcore,
+    dependencies: [dependency('fmt')]
+)
+
+# tests dir has its own meson.build
 subdir('tests')
