@@ -60,16 +60,22 @@ struct OrderByItem {
     bool asc = true;
 };
 
+// Table reference with optional alias
+struct TableRef {
+    std::string table_name;
+    std::string alias; // empty if no alias
+};
+
 // JOIN clause item
 struct JoinItem {
-    std::string table_name;
+    TableRef table_ref;
     std::unique_ptr<Expr> on_condition;
 };
 
 // SELECT statement AST node
 struct SelectStmt {
     std::vector<SelectItem> select_list;
-    std::string from_table;
+    TableRef from_table;
     std::unique_ptr<Expr> where_clause;
     std::vector<JoinItem> joins;
     GroupByClause group_by;

@@ -69,6 +69,7 @@ void Parser::tokenize() {
                 case '*': tokens_.push_back({TokenType::MUL, "*"}); break;
                 case '/': tokens_.push_back({TokenType::DIV, "/"}); break;
                 case '.': tokens_.push_back({TokenType::IDENTIFIER, "."}); break; // Handle qualified names
+                case ';': break; // Skip semicolons
                 default: throw std::runtime_error("Unknown token: " + std::string(1, c));
             }
         }
@@ -107,14 +108,27 @@ SelectStmt Parser::parse_select() {
     expect(TokenType::SELECT);
     stmt.select_list = parse_select_list();
     expect(TokenType::FROM);
-    stmt.from_table = expect(TokenType::IDENTIFIER).value;
-    while (current().type == TokenType::INNER) {
+    stmt.from_table.table_name = expect(TokenType::IDENTIFIER).value;
+    // Optional table alias
+    if (current().type == TokenType::IDENTIFIER) {
+        stmt.from_table.alias = current().value;
         advance();
+    }
+    while (current().type == TokenType::INNER || current().type == TokenType::JOIN) {
+        if (current().type == TokenType::INNER) {
+            advance();
+        }
         expect(TokenType::JOIN);
-        std::string join_table = expect(TokenType::IDENTIFIER).value;
+        TableRef join_table_ref;
+        join_table_ref.table_name = expect(TokenType::IDENTIFIER).value;
+        // Optional table alias
+        if (current().type == TokenType::IDENTIFIER) {
+            join_table_ref.alias = current().value;
+            advance();
+        }
         expect(TokenType::ON);
         auto on_condition = parse_predicate();
-        stmt.joins.push_back({join_table, std::move(on_condition)});
+        stmt.joins.push_back({join_table_ref, std::move(on_condition)});
     }
     if (current().type == TokenType::WHERE) {
         advance();
@@ -263,12 +277,20 @@ std::unique_ptr<Expr> Parser::parse_primary() {
     auto token = current();
     advance();
     if (token.type == TokenType::IDENTIFIER || token.type == TokenType::SUM || token.type == TokenType::COUNT || token.type == TokenType::AVG) {
+        std::string name = token.value;
+        // Handle qualified names like table.column
+        if (current().type == TokenType::IDENTIFIER && current().value == ".") {
+            advance(); // consume '.'
+            auto column_token = current();
+            advance();
+            name += "." + column_token.value;
+        }
         // Check if this is a function call
         if (current().type == TokenType::LPAREN) {
             advance(); // consume '('
             auto expr = std::make_unique<Expr>();
             expr->type = ExprType::FUNC_CALL;
-            expr->func_name = token.value;
+            expr->func_name = name;
             // Parse arguments
             if (current().type != TokenType::RPAREN) {
                 while (true) {
@@ -283,7 +305,7 @@ std::unique_ptr<Expr> Parser::parse_primary() {
             // Column reference
             auto expr = std::make_unique<Expr>();
             expr->type = ExprType::COLUMN_REF;
-            expr->str_val = token.value;
+            expr->str_val = name;
             return expr;
         }
     } else if (token.type == TokenType::MUL) {
