@@ -3,8 +3,9 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include "../include/types.h"
+#include "types.h"
 
+// Dictionary for encoding strings to IDs and vice versa
 class Dictionary {
 public:
     std::vector<std::string> strings;

@@ -1,4 +1,8 @@
-#include <catch2/catch_test_macros.hpp>
+#define CATCH_CONFIG_MAIN
+#include <catch2/catch_all.hpp>
+#include "storage/csv_loader.h"
+#include "catalog/catalog.h"
+#include <fstream>
 #include "types.h"
 
 TEST_CASE("Basic test", "[basic]") {
@@ -7,10 +11,10 @@ TEST_CASE("Basic test", "[basic]") {
 
 TEST_CASE("ColumnVector smoke test", "[columnar]") {
     // Instantiate ColumnVector<int64_t>
-    ColumnVector<int64_t> col(10);
+    ColumnVector<i64> col(10);
 
     // Fill with values
-    for (int64_t i = 0; i < 5; ++i) {
+    for (i64 i = 0; i < 5; ++i) {
         col.append(i * 10);
     }
 
@@ -30,22 +34,22 @@ TEST_CASE("ColumnVector smoke test", "[columnar]") {
 
 TEST_CASE("Datum union test", "[types]") {
     // Test int64_t datum
-    auto d1 = Datum::from_i64(42);
+    Datum d1 = Datum::from_i64(42);
     REQUIRE(d1.type == TypeId::INT64);
     REQUIRE(d1.as_i64() == 42);
 
     // Test double datum
-    auto d2 = Datum::from_f64(3.14);
+    Datum d2 = Datum::from_f64(3.14);
     REQUIRE(d2.type == TypeId::DOUBLE);
     REQUIRE(d2.as_f64() == 3.14);
 
     // Test string ID datum
-    auto d3 = Datum::from_str(123);
+    Datum d3 = Datum::from_str(123);
     REQUIRE(d3.type == TypeId::STRING);
     REQUIRE(d3.as_str() == 123);
 
     // Test date32 datum
-    auto d4 = Datum::from_date32(20231225);
+    Datum d4 = Datum::from_date32(20231225);
     REQUIRE(d4.type == TypeId::DATE32);
     REQUIRE(d4.as_date32() == 20231225);
 
@@ -83,12 +87,12 @@ TEST_CASE("RecordBatch test", "[columnar]") {
     REQUIRE(batch.num_rows() == 0);
 
     // Add columns
-    auto col1 = std::make_unique<ColumnVector<int64_t>>();
+    std::unique_ptr<ColumnVector<i64> > col1(new ColumnVector<i64>());
     col1->append(1);
     col1->append(2);
     col1->append(3);
 
-    auto col2 = std::make_unique<ColumnVector<double>>();
+    std::unique_ptr<ColumnVector<f64> > col2(new ColumnVector<f64>());
     col2->append(1.1);
     col2->append(2.2);
     col2->append(3.3);
@@ -101,8 +105,8 @@ TEST_CASE("RecordBatch test", "[columnar]") {
     REQUIRE(batch.num_rows() == 3);
 
     // Check column access
-    auto* c1 = dynamic_cast<ColumnVector<int64_t>*>(batch.get_column(0));
-    auto* c2 = dynamic_cast<ColumnVector<double>*>(batch.get_column(1));
+    ColumnVector<i64>* c1 = dynamic_cast<ColumnVector<i64>*>(batch.get_column(0));
+    ColumnVector<f64>* c2 = dynamic_cast<ColumnVector<f64>*>(batch.get_column(1));
 
     REQUIRE(c1 != nullptr);
     REQUIRE(c2 != nullptr);
@@ -112,4 +116,92 @@ TEST_CASE("RecordBatch test", "[columnar]") {
     // Check schema access
     REQUIRE(batch.get_column_type(0).name == "id");
     REQUIRE(batch.get_column_type(1).type_id == TypeId::DOUBLE);
+}
+
+TEST_CASE("CSV load test", "[csv]") {
+    // Create a temporary CSV file
+    std::ofstream csv_file("test_load.csv");
+    csv_file << "id,name,value\n";
+    csv_file << "1,Alice,100.5\n";
+    csv_file << "2,Bob,200.25\n";
+    csv_file << "3,Charlie,300.75\n";
+    csv_file.close();
+
+    // Load CSV
+    std::pair<Table, TableMeta> result = load_csv("test_load.csv");
+    Table& table = result.first;
+    TableMeta& meta = result.second;
+
+    // Check table metadata
+    REQUIRE(meta.name.empty()); // Not set yet
+    REQUIRE(meta.row_count == 3);
+    REQUIRE(meta.columns.size() == 3);
+
+    // Check columns
+    REQUIRE(meta.columns[0].name == "id");
+    REQUIRE(meta.columns[0].type == TypeId::INT64);
+    REQUIRE(meta.columns[0].stats.min_i64 == 1);
+    REQUIRE(meta.columns[0].stats.max_i64 == 3);
+
+    REQUIRE(meta.columns[1].name == "name");
+    REQUIRE(meta.columns[1].type == TypeId::STRING);
+    REQUIRE(meta.columns[1].stats.ndv == 3);
+
+    REQUIRE(meta.columns[2].name == "value");
+    REQUIRE(meta.columns[2].type == TypeId::DOUBLE);
+    REQUIRE(meta.columns[2].stats.min_f64 == 100.5);
+    REQUIRE(meta.columns[2].stats.max_f64 == 300.75);
+
+    // Check table data
+    REQUIRE(table.columns.size() == 3);
+    REQUIRE(table.columns[0].name == "id");
+    REQUIRE(table.columns[1].name == "name");
+    REQUIRE(table.columns[2].name == "value");
+
+    // Check dictionary
+    REQUIRE(table.dict->get(0) == "Alice");
+    REQUIRE(table.dict->get(1) == "Bob");
+    REQUIRE(table.dict->get(2) == "Charlie");
+
+    // Clean up
+    std::remove("test_load.csv");
+}
+
+TEST_CASE("Catalog roundtrip test", "[catalog]") {
+    // Create a temporary CSV file
+    std::ofstream csv_file("test_catalog.csv");
+    csv_file << "id,value\n";
+    csv_file << "10,1.1\n";
+    csv_file << "20,2.2\n";
+    csv_file.close();
+
+    // Load and register
+    std::pair<Table, TableMeta> result2 = load_csv("test_catalog.csv");
+    Table& table = result2.first;
+    TableMeta& meta = result2.second;
+    table.name = "mytable";
+    meta.name = "mytable";
+
+    Catalog catalog;
+    catalog.register_table(std::move(meta));
+
+    // Retrieve from catalog
+    const TableMeta* retrieved = catalog.get_table("mytable");
+    REQUIRE(retrieved != nullptr);
+    REQUIRE(retrieved->name == "mytable");
+    REQUIRE(retrieved->row_count == 2);
+    REQUIRE(retrieved->columns.size() == 2);
+
+    REQUIRE(retrieved->columns[0].name == "id");
+    REQUIRE(retrieved->columns[0].type == TypeId::INT64);
+    REQUIRE(retrieved->columns[1].name == "value");
+    REQUIRE(retrieved->columns[1].type == TypeId::DOUBLE);
+
+    // Check table list
+    auto tables = catalog.list_tables();
+    REQUIRE(tables.size() == 1);
+    REQUIRE(tables[0] == "mytable");
+
+    // Clean up
+    std::remove("test_catalog.csv");
 }

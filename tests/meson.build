@@ -1,9 +1,11 @@
 catch2_dep = dependency('catch2-with-main')
 
-test_exe = executable('tests',
-  'test_main.cpp',  # Assuming a test file exists
-  dependencies : [catch2_dep],
-  include_directories : inc
+tests_sources = files('test_main.cpp')
+tests_exe = executable('tests',
+    sources: tests_sources,
+    include_directories: inc,
+    link_with: libcore,
+    dependencies: [catch2_dep]
 )
 
-test('unit tests', test_exe)
+test('unit tests', tests_exe)
