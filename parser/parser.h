@@ -4,7 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <cctype>
-#include "ast.h"
+#include "parser/ast.h"
 
 enum class TokenType {
     SELECT, FROM, WHERE, INNER, JOIN, ON, GROUP, BY, ORDER, ASC, DESC, LIMIT,

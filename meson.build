@@ -1,6 +1,6 @@
 project('bo-sql', 'cpp',
    version : '0.1',
-   default_options : ['cpp_std=c++14']
+   default_options : ['cpp_std=c++20']
 )
 
 # Include directories
@@ -18,12 +18,5 @@ libcore = static_library('core',
     include_directories: inc
 )
 
-# Subdirectories
-subdir('engine')
-subdir('parser')
-subdir('planner')
-subdir('exec')
-subdir('storage')
-subdir('catalog')
-subdir('cli')
+
 subdir('tests')
