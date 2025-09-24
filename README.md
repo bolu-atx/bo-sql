@@ -15,6 +15,14 @@ Build a read-optimized, in-memory, single-threaded SQL engine that:
 
 Non-goals: No transactions, WAL, MVCC, indexes, deletes/updates, subqueries, window functions, outer joins, UDFs, spill-to-disk.
 
+
+### Why?
+
+- Why not?
+- Learn how a SQL engine works end-to-end.
+- Practice C++20, modern build systems (Meson), testing (Catch2), CI (GitHub Actions).
+- Explore design tradeoffs: columnar vs row, vectorized vs tuple
+
 ## Dependencies
 
 - C++20 compiler (e.g., clang or gcc)
@@ -69,11 +77,12 @@ Commands:
 ### M3 – Logical algebra IR (1 day)
 - Nodes: LogicalScan, LogicalFilter, LogicalProject, LogicalHashJoin, LogicalAggregate, LogicalOrder, LogicalLimit.
 
-### M4 – Optimizer (2–3 days)
+### M4 – Physical plan + Vectorized exec (3–4 days)
+- Vectorized Volcano operators: Scan, Selection, Project, HashJoin, HashAggregate, OrderBy, Limit.
+
+### M5 – Optimizer (2–3 days)
 - Rule-based: Predicate pushdown, projection pruning, join reordering.
 
-### M5 – Physical plan + Vectorized exec (3–4 days)
-- Vectorized Volcano operators: Scan, Selection, Project, HashJoin, HashAggregate, OrderBy, Limit.
 
 ### M6 – REPL + EXPLAIN + Tests (2–3 days)
 - CLI REPL, EXPLAIN, unit tests.

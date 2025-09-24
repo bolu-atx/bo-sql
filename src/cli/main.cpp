@@ -8,6 +8,7 @@
 #include "storage/csv_loader.h"
 #include "parser/parser.h"
 #include "logical/planner.h"
+#include "exec/physical_planner.h"
 #include "types.h"
 
 template<typename... Args>
@@ -57,7 +58,7 @@ int main() {
                     std::pair<Table, TableMeta> result = load_csv(filename);
                 result.first.name = table_name;
                 result.second.name = table_name;
-                catalog.register_table(std::move(result.second));
+                     catalog.register_table(std::move(result.first), std::move(result.second));
 
                     print_success("Loaded table '{}' with {} rows", table_name, result.second.row_count);
                 } catch (const std::exception& e) {
@@ -80,12 +81,12 @@ int main() {
                 print_warning("Unknown command");
             }
         } else if (command == "DESCRIBE") {
-            std::string table_name;
-            iss >> table_name;
-            const TableMeta* meta = catalog.get_table(table_name);
-            if (!meta) {
-                print_error("Table '{}' not found", table_name);
-            } else {
+             std::string table_name;
+             iss >> table_name;
+              OptionalRef<const TableMeta> meta = catalog.get_table_meta(table_name);
+             if (!meta.has_value()) {
+                 print_error("Table '{}' not found", table_name);
+             } else {
                  fmt::print("Table: {} ({} rows)\n", meta->name, meta->row_count);
                  fmt::print("Columns:\n");
                  for (const auto& col : meta->columns) {
@@ -100,31 +101,52 @@ int main() {
                      fmt::print(")\n");
                  }
             }
-        } else if (command == "EXPLAIN") {
-            std::string sql;
-            std::getline(iss, sql);
-            // Remove leading spaces
-            size_t start = sql.find_first_not_of(" \t");
-            if (start != std::string::npos) {
-                sql = sql.substr(start);
-            }
-            if (sql.empty()) {
-                print_warning("Syntax: EXPLAIN <sql>");
-            } else {
-                try {
-                    SelectStmt stmt = parse_sql(sql);
-                    LogicalPlanner planner;
-                    auto plan = planner.build_logical_plan(stmt);
-                    fmt::print("{}\n", plan->to_string());
-                } catch (const std::exception& e) {
-                    print_error("Error: {}", e.what());
-                }
-            }
-        } else if (command == "EXIT" || command == "QUIT") {
+         } else if (command == "EXPLAIN") {
+             std::string sql;
+             std::getline(iss, sql);
+             // Remove leading spaces
+             size_t start = sql.find_first_not_of(" \t");
+             if (start != std::string::npos) {
+                 sql = sql.substr(start);
+             }
+             if (sql.empty()) {
+                 print_warning("Syntax: EXPLAIN <sql>");
+             } else {
+                 try {
+                     SelectStmt stmt = parse_sql(sql);
+                     LogicalPlanner planner;
+                     auto plan = planner.build_logical_plan(stmt);
+                     fmt::print("{}\n", plan->to_string());
+                 } catch (const std::exception& e) {
+                     print_error("Error: {}", e.what());
+                 }
+             }
+         } else if (command == "SELECT") {
+             std::string sql;
+             std::getline(iss, sql);
+             // Remove leading spaces
+             size_t start = sql.find_first_not_of(" \t");
+             if (start != std::string::npos) {
+                 sql = sql.substr(start);
+             }
+             if (sql.empty()) {
+                 print_warning("Syntax: SELECT <sql>");
+             } else {
+                 try {
+                     SelectStmt stmt = parse_sql(sql);
+                     LogicalPlanner planner;
+                     auto logical = planner.build_logical_plan(stmt);
+                     auto physical = build_physical_plan(logical.get(), catalog);
+                     run_query(std::move(physical));
+                 } catch (const std::exception& e) {
+                     print_error("Error: {}", e.what());
+                 }
+             }
+         } else if (command == "EXIT" || command == "QUIT") {
             break;
-        } else {
-            print_warning("Unknown command. Available: LOAD TABLE, SHOW TABLES, DESCRIBE <table>, EXPLAIN <sql>, EXIT");
-        }
+         } else {
+             print_warning("Unknown command. Available: LOAD TABLE, SHOW TABLES, DESCRIBE <table>, EXPLAIN <sql>, SELECT <sql>, EXIT");
+         }
 
         fmt::print("> ");
     }

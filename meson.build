@@ -15,7 +15,9 @@ core_sources = files(
     'src/parser/parser.cpp',
     'src/parser/ast_to_string.cpp',
     'src/logical/logical.cpp',
-    'src/logical/planner.cpp'
+    'src/logical/planner.cpp',
+    'src/exec/physical_planner.cpp',
+    'src/exec/execution.cpp'
 )
 
 libcore = static_library('core',

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -79,6 +80,28 @@ struct ColumnType {
 
     bool operator!=(const ColumnType& other) const {
         return !(*this == other);
+    }
+};
+
+// Optional reference wrapper for nullable const references
+template<typename T>
+class OptionalRef {
+    const T* ptr = nullptr;
+public:
+    OptionalRef() = default;
+    OptionalRef(const T& ref) : ptr(&ref) {}
+
+    bool has_value() const { return ptr != nullptr; }
+    explicit operator bool() const { return has_value(); }
+
+    const T& value() const {
+        if (!has_value()) throw std::bad_optional_access();
+        return *ptr;
+    }
+    const T* operator->() const { return ptr; }
+    const T& operator*() const {
+        if (!has_value()) throw std::bad_optional_access();
+        return *ptr;
     }
 };
 
