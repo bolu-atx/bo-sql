@@ -200,6 +200,6 @@ struct Limit : public Operator {
 };
 
 // Execution driver
-void run_query(std::unique_ptr<Operator> root);
+void run_query(std::unique_ptr<Operator> root, const std::vector<std::string>& col_names, const std::vector<TypeId>& col_types, const Dictionary* dict = nullptr);
 
 } // namespace bosql

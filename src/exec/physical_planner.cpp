@@ -22,12 +22,29 @@ std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Ca
             const auto* project = dynamic_cast<const LogicalProject*>(logical);
             if (!project) throw std::runtime_error("Invalid LogicalProject");
             auto child = build_physical_plan(project->children[0].get(), catalog);
-            // For MVP, assume select all columns or first
+            // Resolve column indices
             std::vector<int> indices;
-            for (size_t i = 0; i < project->select_list.size(); ++i) {
-                // Assume column refs, get index
-                // For MVP, assume columns are 0,1,2...
-                indices.push_back(i);
+            // Assume child is scan for now
+            const LogicalOp* child_logical = project->children[0].get();
+            if (child_logical->type == LogicalOpType::SCAN) {
+                const auto* scan = dynamic_cast<const LogicalScan*>(child_logical);
+                OptionalRef<const Table> table = catalog.get_table_data(scan->table_name);
+                if (table.has_value()) {
+                    for (const auto& expr : project->select_list) {
+                        if (expr->type == ExprType::COLUMN_REF) {
+                            size_t idx = table.value().get_column_index(expr->str_val);
+                            indices.push_back(static_cast<int>(idx));
+                        } else {
+                            // For now, assume only column refs
+                            throw std::runtime_error("Unsupported expression in select list");
+                        }
+                    }
+                }
+            } else {
+                // For complex cases, assume indices 0,1,2...
+                for (size_t i = 0; i < project->select_list.size(); ++i) {
+                    indices.push_back(static_cast<int>(i));
+                }
             }
             return std::make_unique<Project>(std::move(child), indices);
         }
