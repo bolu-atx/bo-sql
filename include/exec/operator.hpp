@@ -3,18 +3,36 @@
 #include <vector>
 #include <memory>
 #include <iostream>
+#include <span>
+#include <functional>
 #include "types.h"
 #include "storage/table.h"
 #include "parser/ast.h"
 
 namespace bosql {
 
+// Column slice with optional cleanup
+struct ColumnSlice {
+    const void* data;
+    TypeId type;
+    size_t length;
+    std::function<void()> cleanup;
+};
+
 // ExecBatch for execution: type-erased column slices
 struct ExecBatch {
-    std::vector<const void*> columns; // pointers to column data slices
-    std::vector<TypeId> types;
+    std::vector<ColumnSlice> columns;
     size_t length;
 };
+
+// Typed accessor helper
+template<typename T>
+std::span<const T> get_col(const ExecBatch& batch, size_t i) {
+    if (batch.columns[i].type != type_id_for<T>()) {
+        throw std::runtime_error("Type mismatch");
+    }
+    return {reinterpret_cast<const T*>(batch.columns[i].data), batch.columns[i].length};
+}
 
 // Physical operator interface
 struct Operator {
@@ -40,31 +58,32 @@ struct ColumnarScan : public Operator {
 
         size_t take = std::min(batch_size, row_count - offset);
         out.columns.clear();
-        out.types.clear();
         for (auto& col : table->columns) {
-            out.types.push_back(col.data->type());
-            switch (col.data->type()) {
+            auto type = col.data->type();
+            const void* ptr = nullptr;
+            switch (type) {
                 case TypeId::INT64: {
                     auto* vec = dynamic_cast<ColumnVector<int64_t>*>(col.data.get());
-                    out.columns.push_back(vec->data.data() + offset);
+                    ptr = vec->data.data() + offset;
                     break;
                 }
                 case TypeId::DOUBLE: {
                     auto* vec = dynamic_cast<ColumnVector<double>*>(col.data.get());
-                    out.columns.push_back(vec->data.data() + offset);
+                    ptr = vec->data.data() + offset;
                     break;
                 }
                 case TypeId::STRING: {
                     auto* vec = dynamic_cast<ColumnVector<uint32_t>*>(col.data.get());
-                    out.columns.push_back(vec->data.data() + offset);
+                    ptr = vec->data.data() + offset;
                     break;
                 }
                 case TypeId::DATE32: {
                     auto* vec = dynamic_cast<ColumnVector<int32_t>*>(col.data.get());
-                    out.columns.push_back(vec->data.data() + offset);
+                    ptr = vec->data.data() + offset;
                     break;
                 }
             }
+            out.columns.push_back({ptr, type, take, {}});
         }
         out.length = take;
         offset += take;
@@ -89,8 +108,8 @@ struct Selection : public Operator {
         ExecBatch in;
         while (child->next(in)) {
             // Assume filter on INT64 column 0
-            if (in.types[filter_col] != TypeId::INT64) continue;
-            const int64_t* col_data = reinterpret_cast<const int64_t*>(in.columns[filter_col]);
+            if (in.columns[filter_col].type != TypeId::INT64) continue;
+            const int64_t* col_data = reinterpret_cast<const int64_t*>(in.columns[filter_col].data);
             std::vector<size_t> selected_indices;
             for (size_t i = 0; i < in.length; ++i) {
                 if (col_data[i] > filter_value) {
@@ -101,17 +120,17 @@ struct Selection : public Operator {
 
             // Build output batch with selected rows
             out.columns.resize(in.columns.size());
-            out.types = in.types;
             out.length = selected_indices.size();
             for (size_t c = 0; c < in.columns.size(); ++c) {
-                switch (in.types[c]) {
+                auto type = in.columns[c].type;
+                switch (type) {
                     case TypeId::INT64: {
-                        auto* new_col = new int64_t[out.length];
-                        const int64_t* src = reinterpret_cast<const int64_t*>(in.columns[c]);
+                        std::vector<int64_t> new_col_vec(out.length);
+                        const int64_t* src = reinterpret_cast<const int64_t*>(in.columns[c].data);
                         for (size_t i = 0; i < out.length; ++i) {
-                            new_col[i] = src[selected_indices[i]];
+                            new_col_vec[i] = src[selected_indices[i]];
                         }
-                        out.columns[c] = new_col;
+                        out.columns[c] = {new_col_vec.data(), type, out.length, [vec=std::move(new_col_vec)](){}};
                         break;
                     }
                     // Add other types as needed
@@ -143,10 +162,8 @@ struct Project : public Operator {
         if (!child->next(in)) return false;
 
         out.columns.clear();
-        out.types.clear();
         for (int idx : col_indices) {
             out.columns.push_back(in.columns[idx]);
-            out.types.push_back(in.types[idx]);
         }
         out.length = in.length;
         return true;
