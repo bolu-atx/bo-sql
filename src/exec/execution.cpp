@@ -8,14 +8,15 @@ void run_query(std::unique_ptr<Operator> root) {
     while (root->next(batch)) {
         for (size_t i = 0; i < batch.length; ++i) {
             for (size_t j = 0; j < batch.columns.size(); ++j) {
-                switch (batch.types[j]) {
+                auto& slice = batch.columns[j];
+                switch (slice.type) {
                     case TypeId::INT64: {
-                        const int64_t* col = reinterpret_cast<const int64_t*>(batch.columns[j]);
+                        auto col = get_col<int64_t>(batch, j);
                         std::cout << col[i];
                         break;
                     }
                     case TypeId::DOUBLE: {
-                        const double* col = reinterpret_cast<const double*>(batch.columns[j]);
+                        auto col = get_col<double>(batch, j);
                         std::cout << col[i];
                         break;
                     }
