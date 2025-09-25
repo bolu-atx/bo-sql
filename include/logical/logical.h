@@ -5,6 +5,8 @@
 #include <memory>
 #include "parser/ast.h"
 
+namespace bosql {
+
 // Types of logical operators
 enum class LogicalOpType {
     SCAN,
@@ -109,3 +111,5 @@ struct LogicalLimit : LogicalOp {
 
     std::string to_string(int indent = 0) const override;
 };
+
+} // namespace bosql

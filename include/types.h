@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <vector>
 
+namespace bosql {
+
 using i64 = int64_t;
 using f64 = double;
 using StrId = uint32_t;  // Dictionary-encoded string ID
@@ -175,3 +177,5 @@ struct RecordBatch {
         return schema.at(index);
     }
 };
+
+} // namespace bosql

@@ -10,6 +10,8 @@
 #include "types.h"
 #include "storage/table.h"
 
+namespace bosql {
+
 // Column statistics
 struct ColumnStats {
     i64 min_i64 = 0, max_i64 = 0;
@@ -58,3 +60,5 @@ public:
     // List all table names
     std::vector<std::string> list_tables() const;
 };
+
+} // namespace bosql

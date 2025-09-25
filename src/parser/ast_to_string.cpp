@@ -3,6 +3,8 @@
 #include <fmt/core.h>
 #include <sstream>
 
+namespace bosql {
+
 std::string Expr::to_string() const {
     switch (type) {
         case ExprType::COLUMN_REF:
@@ -134,3 +136,5 @@ std::unique_ptr<Expr> Expr::clone() const {
     }
     return cloned;
 }
+
+} // namespace bosql

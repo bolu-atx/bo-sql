@@ -13,16 +13,16 @@ TEST_CASE("Catalog roundtrip test", "[catalog]") {
     csv_file.close();
 
     // Load and register
-    std::pair<Table, TableMeta> result2 = load_csv("test_catalog.csv");
-    Table& table = result2.first;
-    TableMeta& meta = result2.second;
+    std::pair<bosql::Table, bosql::TableMeta> result2 = bosql::load_csv("test_catalog.csv");
+    bosql::Table& table = result2.first;
+    bosql::TableMeta& meta = result2.second;
     table.name = "mytable";
     meta.name = "mytable";
 
     // Debug: check meta name before registering
     REQUIRE(meta.name == "mytable");
 
-    Catalog catalog;
+    bosql::Catalog catalog;
     catalog.register_table(std::move(table), std::move(meta));
 
     // Debug: check list of tables
@@ -31,16 +31,16 @@ TEST_CASE("Catalog roundtrip test", "[catalog]") {
     REQUIRE(table_list[0] == "mytable");
 
     // Retrieve from catalog
-    OptionalRef<const TableMeta> retrieved = catalog.get_table_meta("mytable");
+    bosql::OptionalRef<const bosql::TableMeta> retrieved = catalog.get_table_meta("mytable");
     REQUIRE(retrieved.has_value());
     REQUIRE(retrieved->name == "mytable");
     REQUIRE(retrieved->row_count == 2);
     REQUIRE(retrieved->columns.size() == 2);
 
     REQUIRE(retrieved->columns[0].name == "id");
-    REQUIRE(retrieved->columns[0].type == TypeId::INT64);
+    REQUIRE(retrieved->columns[0].type == bosql::TypeId::INT64);
     REQUIRE(retrieved->columns[1].name == "value");
-    REQUIRE(retrieved->columns[1].type == TypeId::DOUBLE);
+    REQUIRE(retrieved->columns[1].type == bosql::TypeId::DOUBLE);
 
     // Check table list
     auto tables = catalog.list_tables();

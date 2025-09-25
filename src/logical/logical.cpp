@@ -2,6 +2,8 @@
 #include <fmt/core.h>
 #include <sstream>
 
+namespace bosql {
+
 std::string LogicalScan::to_string(int indent) const {
     std::string prefix(indent, ' ');
     std::string cols_str;
@@ -112,3 +114,5 @@ std::string LogicalLimit::to_string(int indent) const {
     }
     return result;
 }
+
+} // namespace bosql

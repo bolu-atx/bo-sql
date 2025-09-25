@@ -23,18 +23,18 @@ void print_warning(std::string_view fmt, Args const&... args) { fmt::print(fg(fm
 template<typename... Args>
 void print_error(std::string_view fmt, Args const&... args) { fmt::print(fg(fmt::color::red), "{}\n", fmt::vformat(fmt, fmt::make_format_args(args...))); }
 
-std::string type_name(TypeId type) {
+std::string type_name(bosql::TypeId type) {
     switch (type) {
-        case TypeId::INT64: return "INT64";
-        case TypeId::DOUBLE: return "DOUBLE";
-        case TypeId::STRING: return "STRING";
-        case TypeId::DATE32: return "DATE32";
+        case bosql::TypeId::INT64: return "INT64";
+        case bosql::TypeId::DOUBLE: return "DOUBLE";
+        case bosql::TypeId::STRING: return "STRING";
+        case bosql::TypeId::DATE32: return "DATE32";
         default: return "UNKNOWN";
     }
 }
 
 int main() {
-    Catalog catalog;
+    bosql::Catalog catalog;
     std::string line;
 
     fmt::print("bo-sql CLI\n> ");
@@ -55,7 +55,7 @@ int main() {
                     filename = filename.substr(1, filename.size() - 2);
                 }
                 try {
-                    std::pair<Table, TableMeta> result = load_csv(filename);
+                    std::pair<bosql::Table, bosql::TableMeta> result = bosql::load_csv(filename);
                 result.first.name = table_name;
                 result.second.name = table_name;
                      catalog.register_table(std::move(result.first), std::move(result.second));
@@ -80,27 +80,27 @@ int main() {
             } else {
                 print_warning("Unknown command");
             }
-        } else if (command == "DESCRIBE") {
-             std::string table_name;
-             iss >> table_name;
-              OptionalRef<const TableMeta> meta = catalog.get_table_meta(table_name);
-             if (!meta.has_value()) {
-                 print_error("Table '{}' not found", table_name);
-             } else {
-                 fmt::print("Table: {} ({} rows)\n", meta->name, meta->row_count);
-                 fmt::print("Columns:\n");
-                 for (const auto& col : meta->columns) {
-                     fmt::print("  {} {} (ndv: {}", col.name, type_name(col.type), col.stats.ndv);
-                     if (col.type == TypeId::INT64) {
-                         fmt::print(", min: {}, max: {}", col.stats.min_i64, col.stats.max_i64);
-                     } else if (col.type == TypeId::DOUBLE) {
-                         fmt::print(", min: {}, max: {}", col.stats.min_f64, col.stats.max_f64);
-                     } else if (col.type == TypeId::DATE32) {
-                         fmt::print(", min: {}, max: {}", col.stats.min_date, col.stats.max_date);
-                     }
-                     fmt::print(")\n");
-                 }
-            }
+         } else if (command == "DESCRIBE") {
+              std::string table_name;
+              iss >> table_name;
+               bosql::OptionalRef<const bosql::TableMeta> meta = catalog.get_table_meta(table_name);
+              if (!meta.has_value()) {
+                  print_error("Table '{}' not found", table_name);
+              } else {
+                  fmt::print("Table: {} ({} rows)\n", meta->name, meta->row_count);
+                  fmt::print("Columns:\n");
+                  for (const auto& col : meta->columns) {
+                      fmt::print("  {} {} (ndv: {}", col.name, type_name(col.type), col.stats.ndv);
+                      if (col.type == bosql::TypeId::INT64) {
+                          fmt::print(", min: {}, max: {}", col.stats.min_i64, col.stats.max_i64);
+                      } else if (col.type == bosql::TypeId::DOUBLE) {
+                          fmt::print(", min: {}, max: {}", col.stats.min_f64, col.stats.max_f64);
+                      } else if (col.type == bosql::TypeId::DATE32) {
+                          fmt::print(", min: {}, max: {}", col.stats.min_date, col.stats.max_date);
+                      }
+                      fmt::print(")\n");
+                  }
+             }
          } else if (command == "EXPLAIN") {
              std::string sql;
              std::getline(iss, sql);
@@ -111,16 +111,16 @@ int main() {
              }
              if (sql.empty()) {
                  print_warning("Syntax: EXPLAIN <sql>");
-             } else {
-                 try {
-                     SelectStmt stmt = parse_sql(sql);
-                     LogicalPlanner planner;
-                     auto plan = planner.build_logical_plan(stmt);
-                     fmt::print("{}\n", plan->to_string());
-                 } catch (const std::exception& e) {
-                     print_error("Error: {}", e.what());
-                 }
-             }
+              } else {
+                  try {
+                      bosql::SelectStmt stmt = bosql::parse_sql(sql);
+                      bosql::LogicalPlanner planner;
+                      auto plan = planner.build_logical_plan(stmt);
+                      fmt::print("{}\n", plan->to_string());
+                  } catch (const std::exception& e) {
+                      print_error("Error: {}", e.what());
+                  }
+              }
          } else if (command == "SELECT") {
              std::string sql;
              std::getline(iss, sql);
@@ -131,17 +131,17 @@ int main() {
              }
              if (sql.empty()) {
                  print_warning("Syntax: SELECT <sql>");
-             } else {
-                 try {
-                     SelectStmt stmt = parse_sql(sql);
-                     LogicalPlanner planner;
-                     auto logical = planner.build_logical_plan(stmt);
-                     auto physical = build_physical_plan(logical.get(), catalog);
-                     run_query(std::move(physical));
-                 } catch (const std::exception& e) {
-                     print_error("Error: {}", e.what());
-                 }
-             }
+              } else {
+                  try {
+                      bosql::SelectStmt stmt = bosql::parse_sql(sql);
+                      bosql::LogicalPlanner planner;
+                      auto logical = planner.build_logical_plan(stmt);
+                      auto physical = bosql::build_physical_plan(logical.get(), catalog);
+                      bosql::run_query(std::move(physical));
+                  } catch (const std::exception& e) {
+                      print_error("Error: {}", e.what());
+                  }
+              }
          } else if (command == "EXIT" || command == "QUIT") {
             break;
          } else {

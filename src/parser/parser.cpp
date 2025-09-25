@@ -1,5 +1,7 @@
 #include "parser/parser.h"
 
+namespace bosql {
+
 Parser::Parser(const std::string& sql) : sql_(sql), pos_(0) {
     tokenize();
 }
@@ -385,3 +387,5 @@ SelectStmt parse_sql(const std::string& sql) {
     Parser p(sql);
     return p.parse();
 }
+
+} // namespace bosql

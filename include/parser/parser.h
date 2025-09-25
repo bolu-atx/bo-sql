@@ -4,6 +4,8 @@
 #include <vector>
 #include "parser/ast.h"
 
+namespace bosql {
+
 enum class TokenType {
     SELECT, FROM, WHERE, INNER, JOIN, ON, GROUP, BY, HAVING, ORDER, ASC, DESC, LIMIT,
     IDENTIFIER, NUMBER, STRING_LITERAL, COMMA, LPAREN, RPAREN, EQ, NE, LT, LE, GT, GE, PLUS, MINUS, MUL, DIV,
@@ -52,3 +54,5 @@ private:
 };
 
 SelectStmt parse_sql(const std::string& sql);
+
+} // namespace bosql

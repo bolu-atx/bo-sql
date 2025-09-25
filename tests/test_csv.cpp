@@ -14,9 +14,9 @@ TEST_CASE("CSV load test", "[csv]") {
     csv_file.close();
 
     // Load CSV
-    std::pair<Table, TableMeta> result = load_csv("test_load.csv");
-    Table& table = result.first;
-    TableMeta& meta = result.second;
+    std::pair<bosql::Table, bosql::TableMeta> result = bosql::load_csv("test_load.csv");
+    bosql::Table& table = result.first;
+    bosql::TableMeta& meta = result.second;
 
     // Check table metadata
     REQUIRE(meta.name.empty()); // Not set yet
@@ -25,16 +25,16 @@ TEST_CASE("CSV load test", "[csv]") {
 
     // Check columns
     REQUIRE(meta.columns[0].name == "id");
-    REQUIRE(meta.columns[0].type == TypeId::INT64);
+    REQUIRE(meta.columns[0].type == bosql::TypeId::INT64);
     REQUIRE(meta.columns[0].stats.min_i64 == 1);
     REQUIRE(meta.columns[0].stats.max_i64 == 3);
 
     REQUIRE(meta.columns[1].name == "name");
-    REQUIRE(meta.columns[1].type == TypeId::STRING);
+    REQUIRE(meta.columns[1].type == bosql::TypeId::STRING);
     REQUIRE(meta.columns[1].stats.ndv == 3);
 
     REQUIRE(meta.columns[2].name == "value");
-    REQUIRE(meta.columns[2].type == TypeId::DOUBLE);
+    REQUIRE(meta.columns[2].type == bosql::TypeId::DOUBLE);
     REQUIRE(meta.columns[2].stats.min_f64 == 100.5);
     REQUIRE(meta.columns[2].stats.max_f64 == 300.75);
 

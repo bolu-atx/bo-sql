@@ -1,5 +1,7 @@
 #include "exec/operator.hpp"
 
+namespace bosql {
+
 void run_query(std::unique_ptr<Operator> root) {
     root->open();
     ExecBatch batch;
@@ -29,3 +31,5 @@ void run_query(std::unique_ptr<Operator> root) {
     }
     root->close();
 }
+
+} // namespace bosql

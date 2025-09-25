@@ -13,4 +13,8 @@
 #include "storage/table.h"
 #include "catalog/catalog.h"
 
+namespace bosql {
+
 std::pair<Table, TableMeta> load_csv(const std::string& filename);
+
+} // namespace bosql

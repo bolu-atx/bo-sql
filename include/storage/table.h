@@ -8,7 +8,7 @@
 #include "types.h"
 #include "storage/dictionary.h"
 
-// Removed variant, using unique_ptr<Column> instead
+namespace bosql {
 
 // Represents a column in a table with name and data
 struct TableColumn {
@@ -28,3 +28,5 @@ struct Table {
     // Get column data
     const Column& get_column_data(const std::string& col_name) const;
 };
+
+} // namespace bosql
