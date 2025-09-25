@@ -1,6 +1,8 @@
 #include "exec/physical_planner.h"
 #include <stdexcept>
 
+namespace bosql {
+
 std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Catalog& catalog) {
     switch (logical->type) {
         case LogicalOpType::SCAN: {
@@ -39,3 +41,5 @@ std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Ca
             throw std::runtime_error("Unsupported logical operator");
     }
 }
+
+} // namespace bosql

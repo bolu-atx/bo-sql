@@ -1,5 +1,7 @@
 #include "catalog/catalog.h"
 
+namespace bosql {
+
 void Catalog::register_table(Table table, TableMeta&& table_meta) {
     std::string name = table_meta.name;  // copy name before moving
     tables_[name] = {std::move(table), std::move(table_meta)};
@@ -23,3 +25,5 @@ std::vector<std::string> Catalog::list_tables() const {
     }
     return names;
 }
+
+} // namespace bosql

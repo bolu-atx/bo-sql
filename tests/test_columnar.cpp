@@ -3,10 +3,10 @@
 
 TEST_CASE("ColumnVector smoke test", "[columnar]") {
     // Instantiate ColumnVector<int64_t>
-    ColumnVector<i64> col(10);
+    bosql::ColumnVector<bosql::i64> col(10);
 
     // Fill with values
-    for (i64 i = 0; i < 5; ++i) {
+    for (bosql::i64 i = 0; i < 5; ++i) {
         col.append(i * 10);
     }
 
@@ -14,7 +14,7 @@ TEST_CASE("ColumnVector smoke test", "[columnar]") {
     REQUIRE(col.size() == 5);
 
     // Check type
-    REQUIRE(col.type() == TypeId::INT64);
+    REQUIRE(col.type() == bosql::TypeId::INT64);
 
     // Retrieve and check values
     REQUIRE(col.data[0] == 0);
@@ -26,23 +26,23 @@ TEST_CASE("ColumnVector smoke test", "[columnar]") {
 
 TEST_CASE("RecordBatch test", "[columnar]") {
     // Create schema
-    std::vector<ColumnType> schema = {
-        ColumnType(TypeId::INT64, "id"),
-        ColumnType(TypeId::DOUBLE, "value")
+    std::vector<bosql::ColumnType> schema = {
+        bosql::ColumnType(bosql::TypeId::INT64, "id"),
+        bosql::ColumnType(bosql::TypeId::DOUBLE, "value")
     };
 
     // Create RecordBatch
-    RecordBatch batch(schema);
+    bosql::RecordBatch batch(schema);
     REQUIRE(batch.num_columns() == 0);
     REQUIRE(batch.num_rows() == 0);
 
     // Add columns
-    std::unique_ptr<ColumnVector<i64> > col1(new ColumnVector<i64>());
+    std::unique_ptr<bosql::ColumnVector<bosql::i64> > col1(new bosql::ColumnVector<bosql::i64>());
     col1->append(1);
     col1->append(2);
     col1->append(3);
 
-    std::unique_ptr<ColumnVector<f64> > col2(new ColumnVector<f64>());
+    std::unique_ptr<bosql::ColumnVector<bosql::f64> > col2(new bosql::ColumnVector<bosql::f64>());
     col2->append(1.1);
     col2->append(2.2);
     col2->append(3.3);
@@ -55,8 +55,8 @@ TEST_CASE("RecordBatch test", "[columnar]") {
     REQUIRE(batch.num_rows() == 3);
 
     // Check column access
-    ColumnVector<i64>* c1 = dynamic_cast<ColumnVector<i64>*>(batch.get_column(0));
-    ColumnVector<f64>* c2 = dynamic_cast<ColumnVector<f64>*>(batch.get_column(1));
+    bosql::ColumnVector<bosql::i64>* c1 = dynamic_cast<bosql::ColumnVector<bosql::i64>*>(batch.get_column(0));
+    bosql::ColumnVector<bosql::f64>* c2 = dynamic_cast<bosql::ColumnVector<bosql::f64>*>(batch.get_column(1));
 
     REQUIRE(c1 != nullptr);
     REQUIRE(c2 != nullptr);
@@ -65,5 +65,5 @@ TEST_CASE("RecordBatch test", "[columnar]") {
 
     // Check schema access
     REQUIRE(batch.get_column_type(0).name == "id");
-    REQUIRE(batch.get_column_type(1).type_id == TypeId::DOUBLE);
+    REQUIRE(batch.get_column_type(1).type_id == bosql::TypeId::DOUBLE);
 }

@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+namespace bosql {
+
 std::pair<Table, TableMeta> load_csv(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -166,3 +168,5 @@ std::pair<Table, TableMeta> load_csv(const std::string& filename) {
     TableMeta table_meta("", std::move(column_metas), num_rows);
     return std::make_pair(std::move(table), std::move(table_meta));
 }
+
+} // namespace bosql

@@ -2,6 +2,8 @@
 #include <set>
 #include <algorithm>
 
+namespace bosql {
+
 // Helper to collect column names from an expression
 void collect_columns(const Expr* expr, std::set<std::string>& columns) {
     if (!expr) return;
@@ -160,3 +162,5 @@ std::unique_ptr<LogicalOp> LogicalPlanner::build_logical_plan(const SelectStmt& 
 
     return base;
 }
+
+} // namespace bosql

@@ -5,5 +5,9 @@
 #include "catalog/catalog.h"
 #include "operator.hpp"
 
+namespace bosql {
+
 // Direct mapping from logical to physical operators
 std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Catalog& catalog);
+
+} // namespace bosql

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include "types.h"
 
+namespace bosql {
+
 // Dictionary for encoding strings to IDs and vice versa
 class Dictionary {
 public:
@@ -13,3 +15,5 @@ public:
     StrId get_or_add(const std::string& s);
     const std::string& get(StrId id) const;
 };
+
+} // namespace bosql

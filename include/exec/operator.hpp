@@ -7,6 +7,8 @@
 #include "storage/table.h"
 #include "parser/ast.h"
 
+namespace bosql {
+
 // ExecBatch for execution: type-erased column slices
 struct ExecBatch {
     std::vector<const void*> columns; // pointers to column data slices
@@ -182,3 +184,5 @@ struct Limit : public Operator {
 
 // Execution driver
 void run_query(std::unique_ptr<Operator> root);
+
+} // namespace bosql

@@ -6,6 +6,8 @@
 #include <memory>
 #include "types.h"
 
+namespace bosql {
+
 // Types of expressions in the AST
 enum class ExprType {
     COLUMN_REF,
@@ -97,3 +99,5 @@ struct SelectStmt {
 
     std::string to_string() const;
 };
+
+} // namespace bosql

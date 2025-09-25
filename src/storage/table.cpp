@@ -1,5 +1,7 @@
 #include "storage/table.h"
 
+namespace bosql {
+
 size_t Table::get_column_index(const std::string& col_name) const {
     for (size_t i = 0; i < columns.size(); ++i) {
         if (columns[i].name == col_name) return i;
@@ -10,3 +12,5 @@ size_t Table::get_column_index(const std::string& col_name) const {
 const Column& Table::get_column_data(const std::string& col_name) const {
     return *columns[get_column_index(col_name)].data;
 }
+
+} // namespace bosql
