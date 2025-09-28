@@ -18,6 +18,7 @@ struct Token {
     std::string value;
 };
 
+// parses SQL from string into a SelectStatement
 class Parser {
 public:
     Parser(const std::string& sql);
