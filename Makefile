@@ -14,5 +14,5 @@ dev:
 clean:
 	rm -rf build-*
 
-test:
+test: dev
 	meson test -C build-dev

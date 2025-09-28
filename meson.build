@@ -35,5 +35,8 @@ cli_exe = executable('bo-sql',
     dependencies: [dependency('fmt', fallback: ['fmt', 'fmt_dep'])]
 )
 
+# Smoke tests
+test('smoke', find_program('smoke.sh'), workdir: meson.source_root(), depends: [cli_exe])
+
 # tests dir has its own meson.build
 subdir('tests')

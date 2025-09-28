@@ -16,5 +16,6 @@
 namespace bosql {
 
 std::pair<Table, TableMeta> load_csv(const std::string& filename);
+std::pair<Table, TableMeta> load_csv(std::istream& stream);
 
 } // namespace bosql

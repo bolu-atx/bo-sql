@@ -1,4 +1,4 @@
-catch2_dep = dependency('catch2-with-main')
+catch2_dep = dependency('catch2-with-main', default_options: ['tests=false'])
 
 tests_sources = files(
     'test_main.cpp',
