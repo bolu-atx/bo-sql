@@ -1,6 +1,6 @@
 project('bo-sql', 'cpp',
-   version : '0.1',
-   default_options : ['cpp_std=c++20']
+    version : '0.1',
+    default_options : ['cpp_std=c++20', 'default_library=static']
 )
 
 # Include directories
@@ -20,19 +20,21 @@ core_sources = files(
     'src/exec/execution.cpp'
 )
 
+fmt_dep = dependency('nonexistent_fmt', fallback: ['fmt', 'fmt_dep'])
 libcore = static_library('core',
     sources: core_sources,
     include_directories: inc,
-    dependencies: [dependency('fmt', fallback: ['fmt', 'fmt_dep'])]
+    dependencies: [fmt_dep]
 )
 
 # CLI module meson.build
 cli_sources = files('src/cli/main.cpp')
-cli_exe = executable('bo-sql',
+cli_exe = executable('bq',
     sources: cli_sources,
     include_directories: inc,
     link_with: libcore,
-    dependencies: [dependency('fmt', fallback: ['fmt', 'fmt_dep'])]
+    dependencies: [fmt_dep],
+    install: true
 )
 
 # Smoke tests

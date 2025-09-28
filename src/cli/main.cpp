@@ -39,41 +39,7 @@ void execute_select_sql(const std::string& sql, bosql::Catalog& catalog) {
         bosql::LogicalPlanner planner;
         auto logical = planner.build_logical_plan(stmt);
         auto physical = bosql::build_physical_plan(logical.get(), catalog);
-        // Extract column info
-        std::vector<std::string> col_names;
-        std::vector<bosql::TypeId> col_types;
-        const bosql::Dictionary* dict = nullptr;
-        bosql::OptionalRef<const bosql::Table> table_opt;
-        if (logical->type == bosql::LogicalOpType::PROJECT) {
-            const auto* project = dynamic_cast<const bosql::LogicalProject*>(logical.get());
-            if (!project->children.empty() && project->children[0]->type == bosql::LogicalOpType::SCAN) {
-                const auto* scan = dynamic_cast<const bosql::LogicalScan*>(project->children[0].get());
-                table_opt = catalog.get_table_data(scan->table_name);
-                if (table_opt.has_value()) {
-                    dict = table_opt.value().dict.get();
-                    for (size_t k = 0; k < project->select_list.size(); ++k) {
-                        const auto& item = project->select_list[k];
-                        // Column name
-                        std::string name;
-                        if (!project->aliases[k].empty()) {
-                            name = project->aliases[k];
-                        } else if (item->type == bosql::ExprType::COLUMN_REF) {
-                            name = item->str_val;
-                        } else {
-                            name = "expr"; // fallback
-                        }
-                        col_names.push_back(name);
-                        // Column type
-                        if (item->type == bosql::ExprType::COLUMN_REF) {
-                            const bosql::Column& col_data = table_opt.value().get_column_data(item->str_val);
-                            col_types.push_back(col_data.type());
-                        } else {
-                            col_types.push_back(bosql::TypeId::INT64); // fallback
-                        }
-                    }
-                }
-            }
-        }
+        auto [col_names, col_types, dict] = bosql::get_output_schema(logical.get(), catalog);
         bosql::run_query(std::move(physical), col_names, col_types, dict);
     } catch (const std::exception& e) {
         print_error("Error: {}", e.what());
@@ -159,7 +125,7 @@ int main(int argc, char* argv[]) {
         }
         // REPL
         std::string line;
-        fmt::print("bo-sql CLI\n> ");
+        fmt::print("bq CLI\n> ");
         while (std::getline(std::cin, line)) {
         std::istringstream iss(line);
         std::string command;

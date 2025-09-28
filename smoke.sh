@@ -2,7 +2,7 @@
 
 set -e
 
-BINARY="./build/bo-sql"
+BINARY="./build-dev/bq"
 TEST_CSV="test.csv"
 
 if [ ! -f "$BINARY" ]; then
@@ -57,7 +57,7 @@ run_test() {
 }
 
 # Test 1: Binary runs without args (REPL startup)
-run_test "Binary runs and shows REPL prompt" "timeout 2 $BINARY <<< 'EXIT'" "bo-sql CLI"
+run_test "Binary runs and shows REPL prompt" "timeout 2 $BINARY <<< 'EXIT'" "bq CLI"
 
 # Test 2: Load CSV and enter REPL
 run_test "Load CSV and enter REPL" "timeout 2 $BINARY $TEST_CSV <<< 'EXIT'" "Loaded table"
