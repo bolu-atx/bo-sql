@@ -163,4 +163,91 @@ std::unique_ptr<LogicalOp> LogicalPlanner::build_logical_plan(const SelectStmt& 
     return base;
 }
 
+std::tuple<std::vector<std::string>, std::vector<TypeId>, const Dictionary*> get_output_schema(const LogicalOp* plan, const Catalog& catalog) {
+    std::vector<std::string> col_names;
+    std::vector<TypeId> col_types;
+    const Dictionary* dict = nullptr;
+
+    // Find the top-level PROJECT
+    const LogicalOp* current = plan;
+    while (current && current->type != LogicalOpType::PROJECT) {
+        // For aggregates, the output is the aggregates and group keys
+        if (current->type == LogicalOpType::AGGREGATE) {
+            const auto* agg = dynamic_cast<const LogicalAggregate*>(current);
+            // Group keys first
+            for (const auto& key : agg->group_keys) {
+                if (key->type == ExprType::COLUMN_REF) {
+                    col_names.push_back(key->str_val);
+                } else {
+                    col_names.push_back("expr");
+                }
+                col_types.push_back(TypeId::INT64); // fallback
+            }
+            // Then aggregates
+            for (const auto& a : agg->aggregates) {
+                col_names.push_back(a.alias.empty() ? a.func_name : a.alias);
+                col_types.push_back(TypeId::INT64); // fallback, aggregates are usually INT64 or DOUBLE
+            }
+            return std::make_tuple(col_names, col_types, nullptr);
+        }
+        // For other operators, assume single child
+        if (!current->children.empty()) {
+            current = current->children[0].get();
+        } else {
+            break;
+        }
+    }
+
+    if (!current || current->type != LogicalOpType::PROJECT) {
+        // Fallback: assume single column
+        col_names.push_back("result");
+        col_types.push_back(TypeId::INT64);
+        return std::make_tuple(col_names, col_types, nullptr);
+    }
+
+    const auto* project = dynamic_cast<const LogicalProject*>(current);
+
+    // Find the base table (SCAN)
+    const LogicalOp* base = current;
+    while (base && base->type != LogicalOpType::SCAN) {
+        if (!base->children.empty()) {
+            base = base->children[0].get();
+        } else {
+            break;
+        }
+    }
+
+    OptionalRef<const Table> table_opt;
+    if (base && base->type == LogicalOpType::SCAN) {
+        const auto* scan = dynamic_cast<const LogicalScan*>(base);
+        table_opt = catalog.get_table_data(scan->table_name);
+        if (table_opt.has_value()) {
+            dict = table_opt.value().dict.get();
+        }
+    }
+
+    for (size_t k = 0; k < project->select_list.size(); ++k) {
+        const auto& item = project->select_list[k];
+        // Column name
+        std::string name;
+        if (!project->aliases[k].empty()) {
+            name = project->aliases[k];
+        } else if (item->type == ExprType::COLUMN_REF) {
+            name = item->str_val;
+        } else {
+            name = "expr"; // fallback
+        }
+        col_names.push_back(name);
+        // Column type
+        if (item->type == ExprType::COLUMN_REF && table_opt.has_value()) {
+            const Column& col_data = table_opt.value().get_column_data(item->str_val);
+            col_types.push_back(col_data.type());
+        } else {
+            col_types.push_back(TypeId::INT64); // fallback
+        }
+    }
+
+    return std::make_tuple(col_names, col_types, dict);
+}
+
 } // namespace bosql
