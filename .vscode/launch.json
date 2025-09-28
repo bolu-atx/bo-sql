@@ -5,10 +5,10 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Launch bo-sql (lldb)",
+			"name": "Launch bq (lldb)",
 			"type": "lldb",
 			"request": "launch",
-			"program": "${workspaceFolder}/build/cli/bo-sql",
+			"program": "${workspaceFolder}/build/cli/bq",
 			"args": [],
 			"cwd": "${workspaceFolder}",
 			"preLaunchTask": "Meson: Build all targets",
@@ -19,7 +19,7 @@
 			"type": "lldb",
 			"request": "attach",
 			"name": "Attach",
-			"program": "${workspaceFolder}/build/cli/bo-sql"
+			"program": "${workspaceFolder}/build/cli/bq"
 		}
 	]
 }
