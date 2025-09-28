@@ -50,12 +50,12 @@ Non-goals: No transactions, WAL, MVCC, indexes, deletes/updates, subqueries, win
 
 After building, run the CLI:
 ```bash
-./build/bo-sql [csvfile] [--sql] [--output-format <csv|md>]
+./build/bq [csvfile] [--sql] [--output-format <csv|md>]
 ```
 
 Modes:
-- **Interactive REPL**: `./build/bo-sql` or `./build/bo-sql csvfile` (loads CSV if provided)
-- **SQL from stdin**: `./build/bo-sql [csvfile] --sql` (loads CSV from file or stdin, reads SQL from stdin)
+- **Interactive REPL**: `./build/bq` or `./build/bo-sql csvfile` (loads CSV if provided)
+- **SQL from stdin**: `./build/bq [csvfile] --sql` (loads CSV from file or stdin, reads SQL from stdin)
 - `--output-format`: Stub for future output formatting (currently ignored)
 
 Commands in REPL:
@@ -69,19 +69,19 @@ Examples:
 
 1. Interactive REPL with CSV loaded:
    ```bash
-   ./build/bo-sql test.csv
+   ./build/bq test.csv
    > SELECT * FROM table LIMIT 5;
    ```
 
 2. Execute SQL on piped CSV:
    ```bash
-   cat test.csv | ./build/bo-sql --sql
+   cat test.csv | ./build/bq --sql
    SELECT COUNT(*) FROM table;
    ```
 
 3. Load CSV and execute piped SQL:
    ```bash
-   echo "SELECT * FROM table WHERE id > 10;" | ./build/bo-sql test.csv --sql
+   echo "SELECT * FROM table WHERE id > 10;" | ./build/bq test.csv --sql
    ```
 
 ## Development Milestones
