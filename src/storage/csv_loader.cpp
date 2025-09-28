@@ -4,12 +4,7 @@
 
 namespace bosql {
 
-std::pair<Table, TableMeta> load_csv(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file: " + filename);
-    }
-
+std::pair<Table, TableMeta> load_csv(std::istream& stream) {
     Table table;
     table.dict = std::make_shared<Dictionary>();
     std::vector<ColumnMeta> column_metas;
@@ -19,7 +14,7 @@ std::pair<Table, TableMeta> load_csv(const std::string& filename) {
     std::vector<std::vector<std::string> > rows;
 
     // Read headers
-    if (std::getline(file, line)) {
+    if (std::getline(stream, line)) {
         std::stringstream ss(line);
         std::string token;
         while (std::getline(ss, token, ',')) {
@@ -28,7 +23,8 @@ std::pair<Table, TableMeta> load_csv(const std::string& filename) {
     }
 
     // Read data rows
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
+        if (line.empty()) continue;
         std::stringstream ss(line);
         std::string token;
         std::vector<std::string> row;
@@ -167,6 +163,14 @@ std::pair<Table, TableMeta> load_csv(const std::string& filename) {
 
     TableMeta table_meta("", std::move(column_metas), num_rows);
     return std::make_pair(std::move(table), std::move(table_meta));
+}
+
+std::pair<Table, TableMeta> load_csv(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file: " + filename);
+    }
+    return load_csv(file);
 }
 
 } // namespace bosql
