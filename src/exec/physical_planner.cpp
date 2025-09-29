@@ -22,6 +22,9 @@ std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Ca
             const auto* project = dynamic_cast<const LogicalProject*>(logical);
             if (!project) throw std::runtime_error("Invalid LogicalProject");
             auto child = build_physical_plan(project->children[0].get(), catalog);
+            if (project->select_list.empty()) {
+                return child;
+            }
             // Resolve column indices
             std::vector<int> indices;
             // Assume child is scan for now

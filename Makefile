@@ -16,3 +16,6 @@ clean:
 
 test: dev
 	meson test -C build-dev
+
+install: release
+	meson install -C build-release
