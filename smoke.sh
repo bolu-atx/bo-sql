@@ -2,7 +2,19 @@
 
 set -e
 
-BINARY="./build-dev/bq"
+BINARY="${BINARY:-}"
+if [ -z "$BINARY" ]; then
+  if [ -f "./build-dev/bq" ]; then
+    BINARY="./build-dev/bq"
+  elif [ -f "./build/bq" ]; then
+    BINARY="./build/bq"
+  elif [ -n "$MESON_BUILD_ROOT" ] && [ -f "$MESON_BUILD_ROOT/bq" ]; then
+    BINARY="$MESON_BUILD_ROOT/bq"
+  fi
+fi
+
+BINARY=${BINARY:-./build/bq}
+
 TEST_CSV="test.csv"
 
 if [ ! -f "$BINARY" ]; then

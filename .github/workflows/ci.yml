@@ -34,3 +34,11 @@ jobs:
 
     - name: Run tests
       run: meson test -C build
+
+    - name: Upload meson test log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: meson-testlog
+        path: build/meson-logs/testlog.txt
+        if-no-files-found: warn
