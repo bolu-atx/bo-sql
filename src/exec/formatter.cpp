@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <ostream>
+#include <fmt/core.h>
 
 namespace bosql {
 
@@ -28,13 +29,20 @@ void MarkdownFormatter::write_row(std::vector<std::string> row) {
 }
 
 void MarkdownFormatter::end(std::size_t row_count) {
-    if (headers.empty()) {
-        out << "(no results)\n";
-        return;
-    }
     if (row_count == 0) {
         out << "(no results)\n";
         return;
+    }
+    if (headers.empty()) {
+        headers.resize(widths.size());
+        for (std::size_t i = 0; i < headers.size(); ++i) {
+            headers[i] = fmt::format("col{}", i + 1);
+            if (i >= widths.size()) {
+                widths.push_back(headers[i].size());
+            } else {
+                widths[i] = std::max<std::size_t>(widths[i], headers[i].size());
+            }
+        }
     }
     auto flags = out.flags();
     auto print_row = [&](const std::vector<std::string>& cells) {

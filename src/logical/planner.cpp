@@ -226,6 +226,24 @@ std::tuple<std::vector<std::string>, std::vector<TypeId>, const Dictionary*> get
         }
     }
 
+    if (project->select_list.empty()) {
+        if (table_opt.has_value()) {
+            const Table& table = table_opt.value();
+            for (const auto& column : table.columns) {
+                col_names.push_back(column.name);
+                col_types.push_back(column.data->type());
+            }
+            if (dict == nullptr) {
+                dict = table.dict.get();
+            }
+        }
+        if (col_names.empty()) {
+            col_names.push_back("col1");
+            col_types.push_back(TypeId::INT64);
+        }
+        return std::make_tuple(col_names, col_types, dict);
+    }
+
     for (size_t k = 0; k < project->select_list.size(); ++k) {
         const auto& item = project->select_list[k];
         // Column name
