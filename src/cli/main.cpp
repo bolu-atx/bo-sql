@@ -1,7 +1,10 @@
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <utility>
+#include <string_view>
 #include <fmt/core.h>
 #include <fmt/color.h>
 #include "catalog/catalog.h"
@@ -9,6 +12,7 @@
 #include "parser/parser.h"
 #include "logical/planner.h"
 #include "exec/physical_planner.h"
+#include "exec/formatter.hpp"
 #include "types.h"
 
 template<typename... Args>
@@ -33,14 +37,20 @@ std::string type_name(bosql::TypeId type) {
     }
 }
 
-void execute_select_sql(const std::string& sql, bosql::Catalog& catalog) {
+void execute_select_sql(const std::string& sql, bosql::Catalog& catalog, std::string_view output_format) {
     try {
         bosql::SelectStmt stmt = bosql::parse_sql(sql);
         bosql::LogicalPlanner planner;
         auto logical = planner.build_logical_plan(stmt);
         auto physical = bosql::build_physical_plan(logical.get(), catalog);
         auto [col_names, col_types, dict] = bosql::get_output_schema(logical.get(), catalog);
-        bosql::run_query(std::move(physical), col_names, col_types, dict);
+        if (output_format == "csv") {
+            bosql::CsvFormatter formatter(std::cout);
+            bosql::run_query(std::move(physical), col_names, col_types, formatter, dict);
+        } else {
+            bosql::MarkdownFormatter formatter(std::cout);
+            bosql::run_query(std::move(physical), col_names, col_types, formatter, dict);
+        }
     } catch (const std::exception& e) {
         print_error("Error: {}", e.what());
     }
@@ -50,13 +60,14 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> args(argv + 1, argv + argc);
     std::string csv_file;
     bool sql_stdin = false;
-    std::string output_format;
+    std::string output_format = "markdown";
     for (size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--sql") {
             sql_stdin = true;
         } else if (args[i] == "--output-format") {
             if (i + 1 < args.size()) {
                 output_format = args[i + 1];
+                std::transform(output_format.begin(), output_format.end(), output_format.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                 ++i;
             } else {
                 print_error("--output-format requires an argument");
@@ -73,6 +84,11 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         }
+    }
+
+    if (output_format != "markdown" && output_format != "csv") {
+        print_error("Unsupported output format '{}'. Use 'markdown' or 'csv'.", output_format);
+        return 1;
     }
 
     bosql::Catalog catalog;
@@ -106,7 +122,7 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         }
-        execute_select_sql(sql, catalog);
+        execute_select_sql(sql, catalog, output_format);
         return 0;
     } else {
         // Load CSV if provided
@@ -188,11 +204,11 @@ int main(int argc, char* argv[]) {
                       fmt::print(")\n");
                   }
              }
-         } else if (command == "EXPLAIN") {
-             std::string sql;
-             std::getline(iss, sql);
-             // Remove leading spaces
-             size_t start = sql.find_first_not_of(" \t");
+        } else if (command == "EXPLAIN") {
+            std::string sql;
+            std::getline(iss, sql);
+            // Remove leading spaces
+            size_t start = sql.find_first_not_of(" \t");
              if (start != std::string::npos) {
                  sql = sql.substr(start);
              }
@@ -220,12 +236,32 @@ int main(int argc, char* argv[]) {
                if (sql.empty()) {
                    print_warning("Syntax: SELECT <sql>");
                 } else {
-                    execute_select_sql(sql, catalog);
+              execute_select_sql(sql, catalog, output_format);
                 }
          } else if (command == "EXIT" || command == "QUIT") {
             break;
+         } else if (command == "SET") {
+            std::string setting;
+            iss >> setting;
+            if (setting == "FORMAT") {
+                std::string value;
+                iss >> value;
+                if (value.empty()) {
+                    print_warning("Syntax: SET FORMAT <markdown|csv>");
+                } else {
+                    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (value == "markdown" || value == "csv") {
+                        output_format = value;
+                        print_success("Output format set to {}", output_format);
+                    } else {
+                        print_warning("Unsupported output format '{}'. Use 'markdown' or 'csv'.", value);
+                    }
+                }
+            } else {
+                print_warning("Unknown setting");
+            }
          } else {
-             print_warning("Unknown command. Available: LOAD TABLE, SHOW TABLES, DESCRIBE <table>, EXPLAIN <sql>, SELECT <sql>, EXIT");
+             print_warning("Unknown command. Available: LOAD TABLE, SHOW TABLES, DESCRIBE <table>, EXPLAIN <sql>, SELECT <sql>, SET FORMAT <markdown|csv>, EXIT");
          }
 
         fmt::print("> ");

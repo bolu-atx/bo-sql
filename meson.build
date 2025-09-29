@@ -17,6 +17,7 @@ core_sources = files(
     'src/logical/logical.cpp',
     'src/logical/planner.cpp',
     'src/exec/physical_planner.cpp',
+    'src/exec/formatter.cpp',
     'src/exec/execution.cpp'
 )
 

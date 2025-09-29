@@ -6,6 +6,7 @@
 #include <span>
 #include <functional>
 #include "types.h"
+#include "exec/formatter.hpp"
 #include "storage/table.h"
 #include "parser/ast.h"
 
@@ -200,6 +201,10 @@ struct Limit : public Operator {
 };
 
 // Execution driver
-void run_query(std::unique_ptr<Operator> root, const std::vector<std::string>& col_names, const std::vector<TypeId>& col_types, const Dictionary* dict = nullptr);
+void run_query(std::unique_ptr<Operator> root,
+               const std::vector<std::string>& col_names,
+               const std::vector<TypeId>& col_types,
+               Formatter& formatter,
+               const Dictionary* dict = nullptr);
 
 } // namespace bosql

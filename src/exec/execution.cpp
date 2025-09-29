@@ -5,10 +5,15 @@
 
 namespace bosql {
 
-void run_query(std::unique_ptr<Operator> root, const std::vector<std::string>& col_names, const std::vector<TypeId>& col_types, const Dictionary* dict) {
-    std::vector<std::vector<std::string>> rows;
+void run_query(std::unique_ptr<Operator> root,
+               const std::vector<std::string>& col_names,
+               const std::vector<TypeId>& col_types,
+               Formatter& formatter,
+               const Dictionary* dict) {
+    formatter.begin(col_names, col_types);
     root->open();
     ExecBatch batch;
+    std::size_t row_count = 0;
     while (root->next(batch)) {
         for (size_t i = 0; i < batch.length; ++i) {
             std::vector<std::string> row;
@@ -47,39 +52,12 @@ void run_query(std::unique_ptr<Operator> root, const std::vector<std::string>& c
                 }
                 row.push_back(value);
             }
-            rows.push_back(std::move(row));
+            formatter.write_row(std::move(row));
+            ++row_count;
         }
     }
     root->close();
-
-    // Print as markdown table
-    if (rows.empty()) {
-        std::cout << "(no results)\n";
-        return;
-    }
-
-    // Header with types
-    std::cout << "|";
-    for (size_t j = 0; j < col_names.size(); ++j) {
-        std::cout << " " << col_names[j] << " |";
-    }
-    std::cout << "\n";
-
-    // Separator
-    std::cout << "|";
-    for (size_t j = 0; j < col_names.size(); ++j) {
-        std::cout << " --- |";
-    }
-    std::cout << "\n";
-
-    // Rows
-    for (const auto& row : rows) {
-        std::cout << "|";
-        for (const auto& cell : row) {
-            std::cout << " " << cell << " |";
-        }
-        std::cout << "\n";
-    }
+    formatter.end(row_count);
 }
 
 } // namespace bosql
