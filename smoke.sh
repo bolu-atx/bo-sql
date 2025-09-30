@@ -74,14 +74,14 @@ run_test "Binary runs and shows REPL prompt" "timeout 2 $BINARY <<< 'EXIT'" "bq 
 # Test 2: Load CSV and enter REPL
 run_test "Load CSV and enter REPL" "timeout 2 $BINARY $TEST_CSV <<< 'EXIT'" "Loaded table"
 
-# Test 3: SQL from stdin with CSV file
-run_test "Execute SQL from stdin with CSV file" "echo 'SELECT * FROM table LIMIT 1' | $BINARY $TEST_CSV --sql" "|"
+# Test 3: SQL argument with CSV file
+run_test "Execute SQL argument with CSV file" "$BINARY $TEST_CSV --sql 'SELECT * FROM table LIMIT 1'" "|"
 
-# Test 4: SQL from stdin with CSV output format
-run_test "Execute SQL with CSV formatter" "echo 'SELECT * FROM table LIMIT 1' | $BINARY $TEST_CSV --sql --output-format csv" "id,name,value"
+# Test 4: SQL argument with CSV output format
+run_test "Execute SQL with CSV formatter" "$BINARY $TEST_CSV --sql 'SELECT * FROM table LIMIT 1' --output-format csv" "id,name,value"
 
-# Test 5: SQL and CSV from stdin
-run_test "Execute SQL on CSV from stdin" "echo -e 'SELECT * FROM table\nid,name\n1,Alice\n2,Bob\n' | $BINARY --sql" "| id | name  |"
+# Test 5: SQL argument with CSV from stdin
+run_test "Execute SQL on CSV from stdin" "printf 'id,name\\n1,Alice\\n2,Bob\\n' | $BINARY --sql 'SELECT * FROM table'" "| id | name  |"
 
 # Test 6: Set output format in REPL
 run_test "REPL SET FORMAT command" "printf 'SET FORMAT csv\\nSELECT * FROM table LIMIT 1\\nEXIT\\n' | timeout 2 $BINARY $TEST_CSV" "Output format set to csv"
