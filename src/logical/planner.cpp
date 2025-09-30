@@ -116,9 +116,10 @@ std::unique_ptr<LogicalOp> LogicalPlanner::build_logical_plan(const SelectStmt& 
         base = std::move(filter);
     }
 
-    // Add aggregate if group by
-    if (!stmt.group_by.columns.empty()) {
-        auto aggs = extract_aggregates(stmt.select_list);
+    auto aggs = extract_aggregates(stmt.select_list);
+
+    // Add aggregate if group by or aggregates present
+    if (!stmt.group_by.columns.empty() || !aggs.empty()) {
         std::vector<std::unique_ptr<Expr>> group_keys;
         for (const auto& col : stmt.group_by.columns) {
             group_keys.push_back(col->clone()); // TODO: clone

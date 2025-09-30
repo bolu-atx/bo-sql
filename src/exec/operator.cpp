@@ -1,6 +1,7 @@
 #include "exec/operator.hpp"
 #include "exec/expression.h"
 #include <algorithm>
+#include <cctype>
 #include <stdexcept>
 
 namespace bosql {
@@ -121,6 +122,24 @@ TypeId infer_type(const Expr* expr, const ExprBindings& bindings) {
             break;
         }
         case ExprType::FUNC_CALL:
+            if (expr->func_name.empty()) {
+                throw std::runtime_error("Function call unsupported in projection");
+            }
+            std::string func = expr->func_name;
+            std::transform(func.begin(), func.end(), func.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+            if (func == "COUNT") {
+                return TypeId::INT64;
+            }
+            TypeId arg_type = TypeId::INT64;
+            if (!expr->args.empty()) {
+                arg_type = infer_type(expr->args[0].get(), bindings);
+            }
+            if (func == "SUM") {
+                return arg_type == TypeId::DOUBLE ? TypeId::DOUBLE : TypeId::INT64;
+            }
+            if (func == "AVG") {
+                return TypeId::DOUBLE;
+            }
             throw std::runtime_error("Function call unsupported in projection");
     }
     throw std::runtime_error("Cannot infer expression type");
@@ -258,6 +277,45 @@ std::vector<Datum> materialize_row(const ExecBatch& batch,
     return values;
 }
 
+double datum_as_double(const Datum& value) {
+    switch (value.type) {
+        case TypeId::DOUBLE:
+            return value.value.f64_val;
+        case TypeId::INT64:
+            return static_cast<double>(value.value.i64_val);
+        case TypeId::STRING:
+            return static_cast<double>(value.value.str_id);
+        case TypeId::DATE32:
+            return static_cast<double>(value.value.date32_val);
+    }
+    return 0.0;
+}
+
+int compare_datum(const Datum& lhs, const Datum& rhs) {
+    if (lhs.type != rhs.type) {
+        return static_cast<int>(lhs.type) - static_cast<int>(rhs.type);
+    }
+    switch (lhs.type) {
+        case TypeId::INT64:
+            if (lhs.value.i64_val < rhs.value.i64_val) return -1;
+            if (lhs.value.i64_val > rhs.value.i64_val) return 1;
+            return 0;
+        case TypeId::DOUBLE:
+            if (lhs.value.f64_val < rhs.value.f64_val) return -1;
+            if (lhs.value.f64_val > rhs.value.f64_val) return 1;
+            return 0;
+        case TypeId::STRING:
+            if (lhs.value.str_id < rhs.value.str_id) return -1;
+            if (lhs.value.str_id > rhs.value.str_id) return 1;
+            return 0;
+        case TypeId::DATE32:
+            if (lhs.value.date32_val < rhs.value.date32_val) return -1;
+            if (lhs.value.date32_val > rhs.value.date32_val) return 1;
+            return 0;
+    }
+    return 0;
+}
+
 }
 
 ColumnarScan::ColumnarScan(Table* t, std::vector<size_t> idx, size_t batch)
@@ -390,14 +448,45 @@ Project::Project(std::unique_ptr<Operator> c,
     types_.clear();
     names_.reserve(expressions.size());
     types_.reserve(expressions.size());
+    direct_indices.resize(expressions.size(), -1);
     for (size_t i = 0; i < expressions.size(); ++i) {
-        types_.push_back(infer_type(expressions[i].get(), bindings));
+        TypeId expr_type = infer_type(expressions[i].get(), bindings);
+        types_.push_back(expr_type);
         if (i < aliases.size() && !aliases[i].empty()) {
             names_.push_back(aliases[i]);
         } else if (expressions[i]->type == ExprType::COLUMN_REF) {
             names_.push_back(expressions[i]->str_val);
         } else {
             names_.push_back("expr");
+        }
+
+        if (expressions[i]->type == ExprType::COLUMN_REF) {
+            auto it = bindings.name_to_index.find(expressions[i]->str_val);
+            if (it != bindings.name_to_index.end()) {
+                direct_indices[i] = static_cast<int>(it->second);
+            }
+        } else {
+            std::string candidate;
+            if (i < aliases.size() && !aliases[i].empty()) {
+                candidate = aliases[i];
+            } else {
+                candidate = expressions[i]->to_string();
+            }
+            auto it = std::find(input_names.begin(), input_names.end(), candidate);
+            if (it != input_names.end()) {
+                direct_indices[i] = static_cast<int>(std::distance(input_names.begin(), it));
+            } else if (expressions[i]->type == ExprType::FUNC_CALL) {
+                std::string upper_candidate = candidate;
+                std::transform(upper_candidate.begin(), upper_candidate.end(), upper_candidate.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                for (size_t idx = 0; idx < input_names.size(); ++idx) {
+                    std::string upper_name = input_names[idx];
+                    std::transform(upper_name.begin(), upper_name.end(), upper_name.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                    if (upper_name == upper_candidate) {
+                        direct_indices[i] = static_cast<int>(idx);
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -415,12 +504,9 @@ bool Project::next(ExecBatch& out) {
     out.columns.reserve(expressions.size());
     for (size_t i = 0; i < expressions.size(); ++i) {
         auto type = types_[i];
-        if (expressions[i]->type == ExprType::COLUMN_REF) {
-            auto it = bindings.name_to_index.find(expressions[i]->str_val);
-            if (it == bindings.name_to_index.end()) {
-                throw std::runtime_error("Unknown column: " + expressions[i]->str_val);
-            }
-            out.columns.push_back(in.columns[it->second]);
+        int direct = direct_indices[i];
+        if (direct >= 0) {
+            out.columns.push_back(in.columns[direct]);
             continue;
         }
         switch (type) {
@@ -769,6 +855,309 @@ HashJoin::Key HashJoin::build_key(const ExecBatch& batch,
         key.values.push_back(extract_value(batch.columns[column], key_types[i], row));
     }
     return key;
+}
+
+size_t HashAggregate::GroupKeyHash::operator()(const std::vector<Datum>& key) const {
+    size_t seed = 0;
+    for (const auto& value : key) {
+        size_t h = 0;
+        switch (value.type) {
+            case TypeId::INT64:
+                h = std::hash<int64_t>{}(value.value.i64_val);
+                break;
+            case TypeId::DOUBLE:
+                h = std::hash<double>{}(value.value.f64_val);
+                break;
+            case TypeId::STRING:
+                h = std::hash<uint32_t>{}(value.value.str_id);
+                break;
+            case TypeId::DATE32:
+                h = std::hash<int32_t>{}(value.value.date32_val);
+                break;
+        }
+        seed ^= h + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+    }
+    return seed;
+}
+
+bool HashAggregate::GroupKeyEqual::operator()(const std::vector<Datum>& lhs, const std::vector<Datum>& rhs) const {
+    if (lhs.size() != rhs.size()) return false;
+    for (size_t i = 0; i < lhs.size(); ++i) {
+        const Datum& a = lhs[i];
+        const Datum& b = rhs[i];
+        if (a.type != b.type) return false;
+        switch (a.type) {
+            case TypeId::INT64:
+                if (a.value.i64_val != b.value.i64_val) return false;
+                break;
+            case TypeId::DOUBLE:
+                if (a.value.f64_val != b.value.f64_val) return false;
+                break;
+            case TypeId::STRING:
+                if (a.value.str_id != b.value.str_id) return false;
+                break;
+            case TypeId::DATE32:
+                if (a.value.date32_val != b.value.date32_val) return false;
+                break;
+        }
+    }
+    return true;
+}
+
+HashAggregate::HashAggregate(std::unique_ptr<Operator> child_op,
+                             std::vector<std::unique_ptr<Expr>> group_exprs_in,
+                             std::vector<AggregateSpec> aggregates_in)
+    : child(std::move(child_op)),
+      group_exprs(std::move(group_exprs_in)),
+      aggregates(std::move(aggregates_in)) {
+    if (!child) {
+        throw std::runtime_error("HashAggregate child is null");
+    }
+    const auto& child_names = child->output_names();
+    const auto& child_types = child->output_types();
+    dict_ = child->dictionary();
+    child_bindings = make_bindings(child_names, child_types, dict_);
+
+    group_types.reserve(group_exprs.size());
+    for (size_t i = 0; i < group_exprs.size(); ++i) {
+        TypeId type = infer_type(group_exprs[i].get(), child_bindings);
+        group_types.push_back(type);
+        std::string name = (group_exprs[i]->type == ExprType::COLUMN_REF)
+                               ? group_exprs[i]->str_val
+                               : "group" + std::to_string(i + 1);
+        names_.push_back(std::move(name));
+        types_.push_back(type);
+    }
+
+    agg_types.reserve(aggregates.size());
+    for (size_t i = 0; i < aggregates.size(); ++i) {
+        const auto& agg = aggregates[i];
+        const std::string& func = agg.func_name;
+        TypeId arg_type = TypeId::INT64;
+        if (agg.arg && func != "COUNT") {
+            arg_type = infer_type(agg.arg.get(), child_bindings);
+        }
+        TypeId result_type = TypeId::INT64;
+        if (func == "COUNT") {
+            result_type = TypeId::INT64;
+        } else if (func == "SUM") {
+            result_type = (arg_type == TypeId::DOUBLE) ? TypeId::DOUBLE : TypeId::INT64;
+        } else if (func == "AVG") {
+            result_type = TypeId::DOUBLE;
+        }
+        agg_types.push_back(result_type);
+
+        std::string name;
+        if (!agg.alias.empty()) {
+            name = agg.alias;
+        } else {
+            std::string arg_name = agg.arg ? agg.arg->to_string() : "*";
+            name = func + "(" + arg_name + ")";
+        }
+        names_.push_back(std::move(name));
+        types_.push_back(result_type);
+    }
+}
+
+void HashAggregate::open() {
+    groups.clear();
+    result_keys.clear();
+    result_aggs.clear();
+    results_ready = false;
+    child_consumed = false;
+    emit_index = 0;
+    child->open();
+}
+
+static std::vector<Datum> evaluate_key_row(const std::vector<std::unique_ptr<Expr>>& exprs,
+                                           const ExecBatch& batch,
+                                           size_t row,
+                                           const ExprBindings& bindings) {
+    std::vector<Datum> key;
+    key.reserve(exprs.size());
+    for (const auto& expr : exprs) {
+        key.push_back(evaluate_expr(expr.get(), batch, row, bindings));
+    }
+    return key;
+}
+
+bool HashAggregate::next(ExecBatch& out) {
+    if (!results_ready) {
+        ExecBatch batch;
+        while (child->next(batch)) {
+            for (size_t row = 0; row < batch.length; ++row) {
+                std::vector<Datum> key = evaluate_key_row(group_exprs, batch, row, child_bindings);
+                auto it = groups.find(key);
+                if (it == groups.end()) {
+                    it = groups.emplace(std::move(key), std::vector<AggState>(aggregates.size())).first;
+                }
+                auto& states = it->second;
+                for (size_t a = 0; a < aggregates.size(); ++a) {
+                    const std::string& func = aggregates[a].func_name;
+                    if (func == "COUNT") {
+                        states[a].count += 1;
+                    } else {
+                        Datum value = evaluate_expr(aggregates[a].arg.get(), batch, row, child_bindings);
+                        states[a].sum += datum_as_double(value);
+                        states[a].count += 1;
+                    }
+                }
+            }
+        }
+        results_ready = true;
+        child->close();
+        child_consumed = true;
+        for (const auto& entry : groups) {
+            result_keys.push_back(entry.first);
+            result_aggs.push_back(entry.second);
+        }
+    }
+
+    if (emit_index >= result_keys.size()) {
+        return false;
+    }
+
+    size_t batch_size = std::min<size_t>(4096, result_keys.size() - emit_index);
+    std::vector<ColumnBuilder> builders;
+    builders.reserve(types_.size());
+    for (auto type : types_) {
+        builders.push_back(make_builder(type));
+    }
+
+    for (size_t i = 0; i < batch_size; ++i) {
+        const auto& key = result_keys[emit_index + i];
+        const auto& aggs = result_aggs[emit_index + i];
+        size_t col = 0;
+        for (const auto& value : key) {
+            append_value(builders[col], value);
+            ++col;
+        }
+        for (size_t a = 0; a < aggregates.size(); ++a) {
+            const std::string& func = aggregates[a].func_name;
+            const AggState& state = aggs[a];
+            if (func == "COUNT") {
+                append_value(builders[col], Datum::from_i64(state.count));
+            } else if (func == "SUM") {
+                if (agg_types[a] == TypeId::DOUBLE) {
+                    append_value(builders[col], Datum::from_f64(state.sum));
+                } else {
+                    append_value(builders[col], Datum::from_i64(static_cast<int64_t>(state.sum)));
+                }
+            } else if (func == "AVG") {
+                double avg = state.count == 0 ? 0.0 : state.sum / static_cast<double>(state.count);
+                append_value(builders[col], Datum::from_f64(avg));
+            }
+            ++col;
+        }
+    }
+
+    out.clear();
+    out.columns.reserve(types_.size());
+    for (auto& builder : builders) {
+        out.columns.push_back(finalize_builder(builder));
+    }
+    out.length = batch_size;
+    emit_index += batch_size;
+    return true;
+}
+
+void HashAggregate::close() {
+    if (!child_consumed) {
+        child->close();
+        child_consumed = true;
+    }
+    groups.clear();
+    result_keys.clear();
+    result_aggs.clear();
+    results_ready = false;
+    emit_index = 0;
+}
+
+OrderBy::OrderBy(std::unique_ptr<Operator> child_op,
+                 std::vector<SortKey> sort_keys_in)
+    : child(std::move(child_op)),
+      sort_keys(std::move(sort_keys_in)) {
+    if (!child) {
+        throw std::runtime_error("OrderBy child is null");
+    }
+    names_ = child->output_names();
+    types_ = child->output_types();
+    dict_ = child->dictionary();
+    bindings = make_bindings(names_, types_, dict_);
+}
+
+void OrderBy::open() {
+    rows.clear();
+    materialized = false;
+    emit_index = 0;
+    child_consumed = false;
+    child->open();
+}
+
+bool OrderBy::next(ExecBatch& out) {
+    if (!materialized) {
+        ExecBatch batch;
+        while (child->next(batch)) {
+            for (size_t row = 0; row < batch.length; ++row) {
+                SortedRow sorted_row;
+                sorted_row.values = materialize_row(batch, row, types_);
+                sorted_row.sort_values.reserve(sort_keys.size());
+                for (const auto& key : sort_keys) {
+                    sorted_row.sort_values.push_back(evaluate_expr(key.expr.get(), batch, row, bindings));
+                }
+                rows.push_back(std::move(sorted_row));
+            }
+        }
+        materialized = true;
+        child->close();
+        child_consumed = true;
+
+        std::sort(rows.begin(), rows.end(), [&](const SortedRow& a, const SortedRow& b) {
+            for (size_t i = 0; i < sort_keys.size(); ++i) {
+                int cmp = compare_datum(a.sort_values[i], b.sort_values[i]);
+                if (cmp == 0) continue;
+                return sort_keys[i].asc ? cmp < 0 : cmp > 0;
+            }
+            return false;
+        });
+    }
+
+    if (emit_index >= rows.size()) {
+        return false;
+    }
+
+    size_t batch_size = std::min<size_t>(4096, rows.size() - emit_index);
+    std::vector<ColumnBuilder> builders;
+    builders.reserve(types_.size());
+    for (auto type : types_) {
+        builders.push_back(make_builder(type));
+    }
+
+    for (size_t i = 0; i < batch_size; ++i) {
+        const auto& row = rows[emit_index + i];
+        for (size_t col = 0; col < row.values.size(); ++col) {
+            append_value(builders[col], row.values[col]);
+        }
+    }
+
+    out.clear();
+    out.columns.reserve(types_.size());
+    for (auto& builder : builders) {
+        out.columns.push_back(finalize_builder(builder));
+    }
+    out.length = batch_size;
+    emit_index += batch_size;
+    return true;
+}
+
+void OrderBy::close() {
+    if (!child_consumed) {
+        child->close();
+        child_consumed = true;
+    }
+    rows.clear();
+    materialized = false;
+    emit_index = 0;
 }
 
 }

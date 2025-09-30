@@ -73,6 +73,7 @@ private:
     ExprBindings bindings;
     std::vector<std::string> input_names;
     std::vector<TypeId> input_types;
+    std::vector<int> direct_indices;
 };
 
 struct HashJoin : public Operator {
@@ -127,6 +128,77 @@ private:
                   size_t row,
                   const std::vector<size_t>& indices,
                   const std::vector<TypeId>& key_types) const;
+};
+
+struct AggregateSpec {
+    std::string func_name;
+    std::unique_ptr<Expr> arg;
+    std::string alias;
+};
+
+struct HashAggregate : public Operator {
+    HashAggregate(std::unique_ptr<Operator> child,
+                  std::vector<std::unique_ptr<Expr>> group_exprs,
+                  std::vector<AggregateSpec> aggregates);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
+    struct AggState {
+        double sum = 0.0;
+        int64_t count = 0;
+    };
+
+    std::unique_ptr<Operator> child;
+    std::vector<std::unique_ptr<Expr>> group_exprs;
+    std::vector<AggregateSpec> aggregates;
+    ExprBindings child_bindings;
+
+    struct GroupKeyHash {
+        size_t operator()(const std::vector<Datum>& key) const;
+    };
+
+    struct GroupKeyEqual {
+        bool operator()(const std::vector<Datum>& lhs, const std::vector<Datum>& rhs) const;
+    };
+
+    std::unordered_map<std::vector<Datum>, std::vector<AggState>, GroupKeyHash, GroupKeyEqual> groups;
+    std::vector<TypeId> group_types;
+    std::vector<TypeId> agg_types;
+    bool results_ready = false;
+    bool child_consumed = false;
+    size_t emit_index = 0;
+    std::vector<std::vector<Datum>> result_keys;
+    std::vector<std::vector<AggState>> result_aggs;
+};
+
+struct OrderBy : public Operator {
+    struct SortKey {
+        std::unique_ptr<Expr> expr;
+        bool asc;
+    };
+
+    OrderBy(std::unique_ptr<Operator> child,
+            std::vector<SortKey> sort_keys);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
+    std::unique_ptr<Operator> child;
+    std::vector<SortKey> sort_keys;
+    ExprBindings bindings;
+    struct SortedRow {
+        std::vector<Datum> values;
+        std::vector<Datum> sort_values;
+    };
+    std::vector<SortedRow> rows;
+    size_t emit_index = 0;
+    bool materialized = false;
+    bool child_consumed = false;
 };
 
 struct Limit : public Operator {

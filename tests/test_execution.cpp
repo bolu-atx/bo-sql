@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <catch2/catch_all.hpp>
 #include "catalog/catalog.h"
 #include "exec/operator.hpp"
@@ -181,4 +182,89 @@ TEST_CASE("Hash join produces matching rows", "[exec]") {
     REQUIRE(rows[0][1] == "north");
     REQUIRE(rows[1][0] == "2");
     REQUIRE(rows[1][1] == "south");
+}
+
+TEST_CASE("Aggregate computes totals", "[exec]") {
+    std::shared_ptr<Dictionary> detail_dict;
+    Catalog catalog = build_full_catalog(detail_dict);
+    SelectStmt stmt = parse_sql("SELECT detail.region, SUM(orders.qty) AS total FROM orders INNER JOIN detail ON orders.id = detail.id GROUP BY detail.region");
+    LogicalPlanner planner;
+    auto logical = planner.build_logical_plan(stmt);
+    auto physical = build_physical_plan(logical.get(), catalog);
+
+    const auto& out_names = physical->output_names();
+    REQUIRE(out_names.size() == 2);
+    REQUIRE(out_names[0] == "detail.region");
+    REQUIRE(out_names[1] == "total");
+
+    Dictionary* dict = physical->dictionary();
+    auto rows = execute_plan(std::move(physical), dict);
+    REQUIRE(rows.size() == 2);
+    std::sort(rows.begin(), rows.end());
+    REQUIRE(rows[0][0] == "north");
+    REQUIRE(rows[0][1] == "10");
+    REQUIRE(rows[1][0] == "south");
+    REQUIRE(rows[1][1] == "20");
+}
+
+TEST_CASE("Global aggregate counts rows", "[exec]") {
+    Catalog catalog = build_orders_catalog();
+    SelectStmt stmt = parse_sql("SELECT COUNT(*) FROM orders");
+    LogicalPlanner planner;
+    auto logical = planner.build_logical_plan(stmt);
+    auto physical = build_physical_plan(logical.get(), catalog);
+    REQUIRE(dynamic_cast<HashAggregate*>(physical.get()) != nullptr);
+
+    const auto& count_names = physical->output_names();
+    REQUIRE(count_names.size() == 1);
+    REQUIRE(count_names[0] == "COUNT(*)");
+
+    auto rows = execute_plan(std::move(physical), nullptr);
+    REQUIRE(rows.size() == 1);
+    REQUIRE(rows[0][0] == "3");
+}
+
+TEST_CASE("Order by sorts descending", "[exec]") {
+    Catalog catalog = build_orders_catalog();
+    SelectStmt stmt = parse_sql("SELECT orders.id, orders.qty FROM orders ORDER BY orders.qty DESC");
+    LogicalPlanner planner;
+    auto logical = planner.build_logical_plan(stmt);
+    auto physical = build_physical_plan(logical.get(), catalog);
+
+    auto rows = execute_plan(std::move(physical), nullptr);
+    REQUIRE(rows.size() == 3);
+    REQUIRE(rows[0][0] == "3");
+    REQUIRE(rows[0][1] == "30");
+    REQUIRE(rows[2][0] == "1");
+}
+
+TEST_CASE("Order by with limit returns top row", "[exec]") {
+    Catalog catalog = build_orders_catalog();
+    SelectStmt stmt = parse_sql("SELECT orders.id, orders.qty FROM orders ORDER BY orders.qty DESC LIMIT 1");
+    LogicalPlanner planner;
+    auto logical = planner.build_logical_plan(stmt);
+    auto physical = build_physical_plan(logical.get(), catalog);
+
+    auto rows = execute_plan(std::move(physical), nullptr);
+    REQUIRE(rows.size() == 1);
+    REQUIRE(rows[0][0] == "3");
+    REQUIRE(rows[0][1] == "30");
+}
+
+TEST_CASE("Top region by quantity", "[exec]") {
+    std::shared_ptr<Dictionary> detail_dict;
+    Catalog catalog = build_full_catalog(detail_dict);
+    SelectStmt stmt = parse_sql(
+        "SELECT detail.region, SUM(orders.qty) AS total "
+        "FROM orders INNER JOIN detail ON orders.id = detail.id "
+        "GROUP BY detail.region ORDER BY total DESC LIMIT 1");
+    LogicalPlanner planner;
+    auto logical = planner.build_logical_plan(stmt);
+    auto physical = build_physical_plan(logical.get(), catalog);
+
+    Dictionary* dict = physical->dictionary();
+    auto rows = execute_plan(std::move(physical), dict);
+    REQUIRE(rows.size() == 1);
+    REQUIRE(rows[0][0] == "south");
+    REQUIRE(rows[0][1] == "20");
 }
