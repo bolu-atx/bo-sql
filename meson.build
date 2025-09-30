@@ -16,6 +16,8 @@ core_sources = files(
     'src/parser/ast_to_string.cpp',
     'src/logical/logical.cpp',
     'src/logical/planner.cpp',
+    'src/exec/operator.cpp',
+    'src/exec/expression.cpp',
     'src/exec/physical_planner.cpp',
     'src/exec/formatter.cpp',
     'src/exec/execution.cpp'

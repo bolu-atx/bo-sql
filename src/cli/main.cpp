@@ -59,11 +59,19 @@ void execute_select_sql(const std::string& sql, bosql::Catalog& catalog, std::st
 int main(int argc, char* argv[]) {
     std::vector<std::string> args(argv + 1, argv + argc);
     std::string csv_file;
-    bool sql_stdin = false;
+    bool sql_argument = false;
+    std::string sql_query;
     std::string output_format = "markdown";
     for (size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--sql") {
-            sql_stdin = true;
+            if (i + 1 < args.size()) {
+                sql_argument = true;
+                sql_query = args[i + 1];
+                ++i;
+            } else {
+                print_error("--sql requires an argument");
+                return 1;
+            }
         } else if (args[i] == "--output-format") {
             if (i + 1 < args.size()) {
                 output_format = args[i + 1];
@@ -93,11 +101,7 @@ int main(int argc, char* argv[]) {
 
     bosql::Catalog catalog;
 
-    if (sql_stdin) {
-        // Read SQL from stdin first
-        std::string sql;
-        std::getline(std::cin, sql);
-        // Load CSV
+    if (sql_argument) {
         std::string table_name = "table";
         if (!csv_file.empty()) {
             try {
@@ -110,10 +114,8 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         } else {
-            std::stringstream csv_stream;
-            csv_stream << std::cin.rdbuf();
             try {
-                auto [table, meta] = bosql::load_csv(csv_stream);
+                auto [table, meta] = bosql::load_csv(std::cin);
                 table.name = table_name;
                 meta.name = table_name;
                 catalog.register_table(std::move(table), std::move(meta));
@@ -122,7 +124,7 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         }
-        execute_select_sql(sql, catalog, output_format);
+        execute_select_sql(sql_query, catalog, output_format);
         return 0;
     } else {
         // Load CSV if provided
