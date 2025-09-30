@@ -3,37 +3,15 @@
 #include <vector>
 #include <memory>
 #include <iostream>
-#include <span>
-#include <functional>
+#include <unordered_map>
 #include "types.h"
+#include "exec/execution_types.hpp"
+#include "exec/expression.h"
 #include "exec/formatter.hpp"
 #include "storage/table.h"
 #include "parser/ast.h"
 
 namespace bosql {
-
-// Column slice with optional cleanup
-struct ColumnSlice {
-    const void* data;
-    TypeId type;
-    size_t length;
-    std::function<void()> cleanup;
-};
-
-// ExecBatch for execution: type-erased column slices
-struct ExecBatch {
-    std::vector<ColumnSlice> columns;
-    size_t length;
-};
-
-// Typed accessor helper
-template<typename T>
-std::span<const T> get_col(const ExecBatch& batch, size_t i) {
-    if (batch.columns[i].type != type_id_for<T>()) {
-        throw std::runtime_error("Type mismatch");
-    }
-    return {reinterpret_cast<const T*>(batch.columns[i].data), batch.columns[i].length};
-}
 
 // Physical operator interface
 struct Operator {
@@ -41,163 +19,130 @@ struct Operator {
     virtual void open() = 0;
     virtual bool next(ExecBatch& out) = 0;
     virtual void close() = 0;
+
+    const std::vector<std::string>& output_names() const { return names_; }
+    const std::vector<TypeId>& output_types() const { return types_; }
+    Dictionary* dictionary() const { return dict_; }
+
+protected:
+    std::vector<std::string> names_;
+    std::vector<TypeId> types_;
+    Dictionary* dict_ = nullptr;
 };
 
-// ColumnarScan: scans a table in batches
 struct ColumnarScan : public Operator {
+    ColumnarScan(Table* t, std::vector<size_t> idx, size_t batch = 4096);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
     Table* table;
-    size_t offset = 0;
+    std::vector<size_t> indices;
+    size_t offset;
     size_t batch_size;
-
-    ColumnarScan(Table* t, size_t batch = 4096) : table(t), batch_size(batch) {}
-
-    void open() override { offset = 0; }
-
-    bool next(ExecBatch& out) override {
-        size_t row_count = table->columns.empty() ? 0 : table->columns[0].data->size();
-        if (offset >= row_count) return false;
-
-        size_t take = std::min(batch_size, row_count - offset);
-        out.columns.clear();
-        for (auto& col : table->columns) {
-            auto type = col.data->type();
-            const void* ptr = nullptr;
-            switch (type) {
-                case TypeId::INT64: {
-                    auto* vec = dynamic_cast<ColumnVector<int64_t>*>(col.data.get());
-                    ptr = vec->data.data() + offset;
-                    break;
-                }
-                case TypeId::DOUBLE: {
-                    auto* vec = dynamic_cast<ColumnVector<double>*>(col.data.get());
-                    ptr = vec->data.data() + offset;
-                    break;
-                }
-                case TypeId::STRING: {
-                    auto* vec = dynamic_cast<ColumnVector<uint32_t>*>(col.data.get());
-                    ptr = vec->data.data() + offset;
-                    break;
-                }
-                case TypeId::DATE32: {
-                    auto* vec = dynamic_cast<ColumnVector<int32_t>*>(col.data.get());
-                    ptr = vec->data.data() + offset;
-                    break;
-                }
-            }
-            out.columns.push_back({ptr, type, take, {}});
-        }
-        out.length = take;
-        offset += take;
-        return true;
-    }
-
-    void close() override {}
 };
 
-// Selection: filters rows based on predicate (hardcoded for MVP)
 struct Selection : public Operator {
+    Selection(std::unique_ptr<Operator> c, std::unique_ptr<Expr> pred);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
     std::unique_ptr<Operator> child;
-    // For MVP: hardcoded filter on first column > 10
-    int filter_col = 0;
-    int64_t filter_value = 10;
-
-    Selection(std::unique_ptr<Operator> c) : child(std::move(c)) {}
-
-    void open() override { child->open(); }
-
-    bool next(ExecBatch& out) override {
-        ExecBatch in;
-        while (child->next(in)) {
-            // Assume filter on INT64 column 0
-            if (in.columns[filter_col].type != TypeId::INT64) continue;
-            const int64_t* col_data = reinterpret_cast<const int64_t*>(in.columns[filter_col].data);
-            std::vector<size_t> selected_indices;
-            for (size_t i = 0; i < in.length; ++i) {
-                if (col_data[i] > filter_value) {
-                    selected_indices.push_back(i);
-                }
-            }
-            if (selected_indices.empty()) continue;
-
-            // Build output batch with selected rows
-            out.columns.resize(in.columns.size());
-            out.length = selected_indices.size();
-            for (size_t c = 0; c < in.columns.size(); ++c) {
-                auto type = in.columns[c].type;
-                switch (type) {
-                    case TypeId::INT64: {
-                        std::vector<int64_t> new_col_vec(out.length);
-                        const int64_t* src = reinterpret_cast<const int64_t*>(in.columns[c].data);
-                        for (size_t i = 0; i < out.length; ++i) {
-                            new_col_vec[i] = src[selected_indices[i]];
-                        }
-                        out.columns[c] = {new_col_vec.data(), type, out.length, [vec=std::move(new_col_vec)](){}};
-                        break;
-                    }
-                    // Add other types as needed
-                    default:
-                        // For MVP, skip
-                        break;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
-    void close() override { child->close(); }
+    std::unique_ptr<Expr> predicate;
+    ExprBindings bindings;
 };
 
-// Project: selects specific columns
 struct Project : public Operator {
+    Project(std::unique_ptr<Operator> c,
+            std::vector<std::unique_ptr<Expr>> exprs,
+            std::vector<std::string> aliases);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
     std::unique_ptr<Operator> child;
-    std::vector<int> col_indices;
-
-    Project(std::unique_ptr<Operator> c, std::vector<int> idx)
-        : child(std::move(c)), col_indices(std::move(idx)) {}
-
-    void open() override { child->open(); }
-
-    bool next(ExecBatch& out) override {
-        ExecBatch in;
-        if (!child->next(in)) return false;
-
-        out.columns.clear();
-        for (int idx : col_indices) {
-            out.columns.push_back(in.columns[idx]);
-        }
-        out.length = in.length;
-        return true;
-    }
-
-    void close() override { child->close(); }
+    std::vector<std::unique_ptr<Expr>> expressions;
+    std::vector<std::string> aliases;
+    ExprBindings bindings;
+    std::vector<std::string> input_names;
+    std::vector<TypeId> input_types;
 };
 
-// Limit: restricts number of rows
+struct HashJoin : public Operator {
+    HashJoin(std::unique_ptr<Operator> left,
+             std::unique_ptr<Operator> right,
+             std::vector<std::string> left_keys,
+             std::vector<std::string> right_keys,
+             std::unique_ptr<Expr> residual);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
+    std::unique_ptr<Operator> left_child;
+    std::unique_ptr<Operator> right_child;
+    std::vector<std::string> left_key_names;
+    std::vector<std::string> right_key_names;
+    std::unique_ptr<Expr> residual_filter;
+    std::vector<size_t> left_key_indices;
+    std::vector<size_t> right_key_indices;
+    std::vector<TypeId> left_key_types;
+    std::vector<TypeId> right_key_types;
+    std::vector<std::string> left_names;
+    std::vector<TypeId> left_types;
+    std::vector<std::string> right_names;
+    std::vector<TypeId> right_types;
+    ExprBindings left_bindings;
+    ExprBindings right_bindings;
+
+    struct Key {
+        std::vector<Datum> values;
+    };
+
+    struct KeyHash {
+        size_t operator()(const Key& key) const;
+    };
+
+    struct KeyEqual {
+        bool operator()(const Key& lhs, const Key& rhs) const;
+    };
+
+    std::unordered_map<Key, std::vector<size_t>, KeyHash, KeyEqual> hash_table;
+    std::vector<std::vector<Datum>> build_rows;
+    ExecBatch probe_batch;
+    bool probe_batch_valid = false;
+    size_t probe_row_index = 0;
+    std::vector<size_t> current_matches;
+    size_t match_index = 0;
+
+    Key build_key(const ExecBatch& batch,
+                  size_t row,
+                  const std::vector<size_t>& indices,
+                  const std::vector<TypeId>& key_types) const;
+};
+
 struct Limit : public Operator {
+    Limit(std::unique_ptr<Operator> c, int64_t n);
+
+    void open() override;
+    bool next(ExecBatch& out) override;
+    void close() override;
+
+private:
     std::unique_ptr<Operator> child;
     int64_t limit;
-    int64_t produced = 0;
-
-    Limit(std::unique_ptr<Operator> c, int64_t n)
-        : child(std::move(c)), limit(n) {}
-
-    void open() override { child->open(); }
-
-    bool next(ExecBatch& out) override {
-        if (produced >= limit) return false;
-
-        ExecBatch in;
-        if (!child->next(in)) return false;
-
-        size_t take = std::min<int64_t>(limit - produced, in.length);
-        out = in; // shallow copy
-        out.length = take;
-        produced += take;
-        return true;
-    }
-
-    void close() override { child->close(); }
+    int64_t produced;
+    ExecBatch cache;
+    size_t cache_offset = 0;
+    bool cache_valid = false;
 };
 
 // Execution driver
@@ -207,4 +152,4 @@ void run_query(std::unique_ptr<Operator> root,
                Formatter& formatter,
                const Dictionary* dict = nullptr);
 
-} // namespace bosql
+}
