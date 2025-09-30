@@ -33,7 +33,7 @@ jobs:
       run: ninja -C build
 
     - name: Run tests
-      run: meson test -C build
+      run: meson test -C build --print-errorlogs
 
     - name: Upload meson test log
       if: always()

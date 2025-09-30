@@ -1,4 +1,7 @@
 #include "exec/physical_planner.h"
+#include <algorithm>
+#include <cctype>
+#include <iostream>
 #include <stdexcept>
 
 namespace bosql {
@@ -39,8 +42,12 @@ std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Ca
         case LogicalOpType::PROJECT: {
             const auto* project = dynamic_cast<const LogicalProject*>(logical);
             if (!project) throw std::runtime_error("Invalid LogicalProject");
-            auto child = build_physical_plan(project->children[0].get(), catalog);
+            const LogicalOp* child_logical = project->children[0].get();
+            auto child = build_physical_plan(child_logical, catalog);
             if (project->select_list.empty()) {
+                return child;
+            }
+            if (child_logical->type == LogicalOpType::AGGREGATE) {
                 return child;
             }
             std::vector<std::unique_ptr<Expr>> exprs;
@@ -65,6 +72,45 @@ std::unique_ptr<Operator> build_physical_plan(const LogicalOp* logical, const Ca
                                              join->left_keys,
                                              join->right_keys,
                                              std::move(residual));
+        }
+        case LogicalOpType::AGGREGATE: {
+            const auto* aggregate = dynamic_cast<const LogicalAggregate*>(logical);
+            if (!aggregate) throw std::runtime_error("Invalid LogicalAggregate");
+            auto child = build_physical_plan(aggregate->children[0].get(), catalog);
+            std::vector<std::unique_ptr<Expr>> group_exprs;
+            group_exprs.reserve(aggregate->group_keys.size());
+            for (const auto& key : aggregate->group_keys) {
+                group_exprs.push_back(key->clone());
+            }
+            std::vector<AggregateSpec> specs;
+            specs.reserve(aggregate->aggregates.size());
+            for (const auto& agg : aggregate->aggregates) {
+                AggregateSpec spec;
+                spec.func_name = agg.func_name;
+                std::transform(spec.func_name.begin(), spec.func_name.end(), spec.func_name.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                spec.alias = agg.alias;
+                if (agg.arg) {
+                    spec.arg = agg.arg->clone();
+                } else {
+                    spec.arg.reset();
+                }
+                specs.push_back(std::move(spec));
+            }
+            return std::make_unique<HashAggregate>(std::move(child), std::move(group_exprs), std::move(specs));
+        }
+        case LogicalOpType::ORDER: {
+            const auto* order = dynamic_cast<const LogicalOrder*>(logical);
+            if (!order) throw std::runtime_error("Invalid LogicalOrder");
+            auto child = build_physical_plan(order->children[0].get(), catalog);
+            std::vector<OrderBy::SortKey> sort_keys;
+            sort_keys.reserve(order->order_by.size());
+            for (const auto& item : order->order_by) {
+                OrderBy::SortKey key;
+                key.expr = item.expr->clone();
+                key.asc = item.asc;
+                sort_keys.push_back(std::move(key));
+            }
+            return std::make_unique<OrderBy>(std::move(child), std::move(sort_keys));
         }
         case LogicalOpType::LIMIT: {
             const auto* limit = dynamic_cast<const LogicalLimit*>(logical);
